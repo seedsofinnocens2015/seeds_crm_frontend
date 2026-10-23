@@ -72,7 +72,7 @@ export interface LeadFilters {
   quickMetricFilter?: string;
 }
 
-export const initialFilters: LeadFilters = {
+const initialFilters: LeadFilters = {
   leadEntryDateFrom: "",
   leadEntryDateTo: "",
   location: "",
