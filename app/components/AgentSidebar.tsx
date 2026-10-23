@@ -48,7 +48,7 @@ export default function AgentSidebar({ user, onLogout }: AgentSidebarProps) {
         <div>
           {/* Header */}
           <div className="h-16 px-6 border-b border-slate-200 items-center gap-3 bg-white">
-              <Image src="/logo.svg" alt="Surgical CRM Logo" width={150} height={38} priority className="h-15 w-auto" />
+              <Image src="/logo.svg" alt="Seeds of Innocence CRM Logo" width={150} height={38} priority className="h-15 w-auto" />
             </div>
           
 

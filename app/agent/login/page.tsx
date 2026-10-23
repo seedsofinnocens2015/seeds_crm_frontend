@@ -104,7 +104,7 @@ function AgentLoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="agent@surgicalcrm.com"
+            placeholder="agent@seedsofinnocence.com"
             className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#cc2727] focus:border-[#cc2727] transition-all text-sm font-medium"
           />
         </div>

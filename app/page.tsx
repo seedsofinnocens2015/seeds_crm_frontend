@@ -59,7 +59,7 @@ export default function Home() {
       <header className="border-b border-slate-200 bg-white/90 backdrop-blur-md sticky top-0 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Image src="/logo.svg" alt="Surgical CRM Logo" width={160} height={40} priority className="h-15 w-auto" />
+            <Image src="/logo.svg" alt="Seeds of Innocence CRM Logo" width={160} height={40} priority className="h-15 w-auto" />
           </div>
           <div className="flex items-center gap-3">
             {!loadingUser && currentUser ? (
@@ -101,7 +101,7 @@ export default function Home() {
       {/* Hero Section */}
       <main className="max-w-7xl mx-auto px-6 py-6 flex-1 flex flex-col items-center justify-center text-center">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 text-[#cc2727] text-xs font-bold uppercase tracking-wider mb-3">
-          <Image src="/logo.webp" alt="Surgical CRM Logo" width={160} height={40} priority className="h-45 w-80" />
+          <Image src="/logo.webp" alt="Seeds of Innocence CRM Logo" width={160} height={40} priority className="h-45 w-80" />
         </div>
 
         <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 tracking-tight max-w-5xl">

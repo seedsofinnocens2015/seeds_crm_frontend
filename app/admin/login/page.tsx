@@ -91,7 +91,7 @@ export default function AdminLoginPage() {
           <ShieldCheck className="w-8 h-8" />
         </div>
         <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">
-          Surgical CRM
+          Seeds of Innocence CRM
         </h2>
         <p className="mt-2 text-sm text-slate-600">
           Sign in to access your administrative dashboard
@@ -121,7 +121,7 @@ export default function AdminLoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@surgicalcrm.com"
+                placeholder="admin@seedsofinnocence.com"
                 className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#cc2727] focus:border-[#cc2727] transition-all text-sm font-medium"
               />
             </div>

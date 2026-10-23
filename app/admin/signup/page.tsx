@@ -75,7 +75,7 @@ export default function AdminSignupPage() {
           Create Admin Account
         </h2>
         <p className="mt-2 text-sm text-slate-600">
-          Set up your primary Surgical CRM administrator profile
+          Set up your primary Seeds of Innocence administrator profile
         </p>
       </div>
 
@@ -136,7 +136,7 @@ export default function AdminSignupPage() {
                 required
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="admin@surgicalcrm.com"
+                placeholder="admin@seedsofinnocence.com"
                 className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#cc2727] focus:border-[#cc2727] text-sm font-medium"
               />
             </div>

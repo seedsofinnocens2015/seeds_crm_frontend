@@ -46,7 +46,7 @@ export default function MISSidebar({ user, onLogout }: MISSidebarProps) {
           <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between bg-white">
             <Image
               src="/logo.svg"
-              alt="Surgical CRM Logo"
+              alt="Seeds of Innocence CRM Logo"
               width={140}
               height={36}
               priority

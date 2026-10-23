@@ -66,7 +66,7 @@ export default function AdminSidebar({ user, onLogout }: AdminSidebarProps) {
         <div>
           {/* Header */}
           <div className="h-16 px-4 border-b border-slate-200 flex items-center bg-white">
-            <Image src="/logo.svg" alt="Surgical CRM Logo" width={150} height={38} priority className="h-15 w-auto" />
+            <Image src="/logo.svg" alt="Seeds of Innocence CRM Logo" width={150} height={38} priority className="h-15 w-auto" />
           </div>
           
 

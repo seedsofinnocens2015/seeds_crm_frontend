@@ -12,12 +12,12 @@ export default function Footer({ className = "" }: FooterProps) {
       <p className="tracking-tight">
         © {new Date().getFullYear()}{" "}
         <Link
-          href="https://www.seedsofinnocens.com/seeds-of-innocens-surgical-center/"
+          href="https://www.seedsofinnocens.com/"
           target="_blank"
           rel="noopener noreferrer"
           className="font-semibold text-white hover:text-white/80"
         >
-          Seeds of Innocence Surgical Centre
+          Seeds of Innocence
         </Link>
         . All Rights Reserved. Designed &amp; Developed by{" "}
         <Link
