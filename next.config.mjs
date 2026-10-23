@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
-    const backendUrl = process.env.BACKEND_API_URL || "https://crmbackend.seedsofinnocens.com";
+    // Read backend URL from environment variables, fallback to localhost for development
+    const backendUrl = process.env.BACKEND_API_URL || "http://localhost:5000";
 
     return {
       beforeFiles: [
