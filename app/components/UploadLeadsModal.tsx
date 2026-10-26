@@ -389,7 +389,7 @@ export default function UploadLeadsModal({
           secondaryMobileNumber: altPhone,
           subStatus: subDisp,
           leadStage: disp,
-          leadValidStatus: validSt,
+          leadValidStatus: validStat,
           centreLocation: loc,
           location: loc,
           callerName: caller,

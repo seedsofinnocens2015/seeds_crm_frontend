@@ -22,8 +22,9 @@ import {
 } from "lucide-react";
 
 interface TeamLeaderSidebarProps {
+  activeTab?: string;
   user: any;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
 }
 
 export default function TeamLeaderSidebar({ user, onLogout }: TeamLeaderSidebarProps) {

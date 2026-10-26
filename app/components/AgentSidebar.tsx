@@ -20,8 +20,9 @@ import {
 } from "lucide-react";
 
 interface AgentSidebarProps {
+  activeTab?: string;
   user: any;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
 }
 
 export default function AgentSidebar({ user, onLogout }: AgentSidebarProps) {

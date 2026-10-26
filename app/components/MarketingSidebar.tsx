@@ -17,8 +17,9 @@ import {
 } from "lucide-react";
 
 interface MarketingSidebarProps {
+  activeTab?: string;
   user: any;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
 }
 
 export default function MarketingSidebar({ user, onLogout }: MarketingSidebarProps) {

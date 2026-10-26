@@ -16,8 +16,9 @@ import {
 } from "lucide-react";
 
 interface MISSidebarProps {
+  activeTab?: string;
   user: any;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
 }
 
 export default function MISSidebar({ user, onLogout }: MISSidebarProps) {

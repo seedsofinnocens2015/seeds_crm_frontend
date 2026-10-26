@@ -23,8 +23,9 @@ import {
 } from "lucide-react";
 
 interface AdminSidebarProps {
+  activeTab?: string;
   user: any;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
 }
 
 export default function AdminSidebar({ user, onLogout }: AdminSidebarProps) {
