@@ -18,25 +18,64 @@ import {
   HeartPulse,
   FileText,
   Clock,
+  Heart,
+  Building,
 } from "lucide-react";
 import AdminSidebar from "@/app/components/AdminSidebar";
 import Footer from "@/app/components/Footer";
 import LeadAuditHistory, { AuditLog } from "@/app/components/LeadAuditHistory";
 import NotesHistory, { NoteHistoryItem } from "@/app/components/NotesHistory";
 import {
-  LOCATIONS,
-  TREATMENTS,
+  CENTRE_LOCATIONS,
+  CAMP_LOCATIONS,
+  CAMP_TO_CENTRE_MAP,
+  WHEN_START_TREATMENT_OPTIONS,
   LEAD_SOURCES,
+  CAMPAIGN_NAMES,
+  calculateLeadScore,
+  SOURCE_NAMES,
+  CAMPAIGN_TO_INFO,
+  SOURCE_NAME_TO_INFO,
+  GENERAL_SOURCES,
   SUB_DISPOSITIONS_MAP,
-  TELECONSULTATION_SLOTS,
   formatDateToDDMMMYY,
   parseDDMMMYYToISO,
-  getMonthFromDate,
+  getTodayDDMMMYY,
+  getFormattedTimestamp,
   notifyLeadUpdated,
 } from "@/lib/leadOptions";
 import { IFormField } from "@/types/formConfig";
 import { DEFAULT_FORM_FIELDS } from "@/lib/defaultFormFields";
 import { getCachedLeadDetail } from "@/lib/leadsCache";
+
+const COUNTRY_CODES = [
+  { code: "+91", country: "India (IN)" },
+  { code: "+1", country: "USA/Canada (US/CA)" },
+  { code: "+44", country: "United Kingdom (UK)" },
+  { code: "+971", country: "United Arab Emirates (UAE)" },
+  { code: "+61", country: "Australia (AU)" },
+  { code: "+65", country: "Singapore (SG)" },
+  { code: "+966", country: "Saudi Arabia (KSA)" },
+  { code: "+974", country: "Qatar (QA)" },
+  { code: "+965", country: "Kuwait (KW)" },
+  { code: "+968", country: "Oman (OM)" },
+  { code: "+977", country: "Nepal (NP)" },
+  { code: "+880", country: "Bangladesh (BD)" },
+];
+
+function splitPhone(fullPhone: string | undefined) {
+  if (!fullPhone) return { code: "+91", raw: "" };
+  const trimmed = fullPhone.trim();
+  for (const c of COUNTRY_CODES) {
+    if (trimmed.startsWith(c.code)) {
+      return {
+        code: c.code,
+        raw: trimmed.slice(c.code.length).trim(),
+      };
+    }
+  }
+  return { code: "+91", raw: trimmed };
+}
 
 export default function LeadDetailPage({
   params,
@@ -63,48 +102,153 @@ export default function LeadDetailPage({
     Record<string, { disposition: string; validStatus: string }>
   >({ ...SUB_DISPOSITIONS_MAP });
 
+  // Phone states
+  const [primaryCountryCode, setPrimaryCountryCode] = useState("+91");
+  const [primaryRawPhone, setPrimaryRawPhone] = useState("");
+  const [secondaryCountryCode, setSecondaryCountryCode] = useState("+91");
+  const [secondaryRawPhone, setSecondaryRawPhone] = useState("");
+  const [whatsappCountryCode, setWhatsappCountryCode] = useState("+91");
+  const [whatsappRawPhone, setWhatsappRawPhone] = useState("");
+  const [otherCountryCode, setOtherCountryCode] = useState("+91");
+  const [otherRawPhone, setOtherRawPhone] = useState("");
+
   const [formData, setFormData] = useState<any>({
     uniqueId: "",
-    date: "",
-    month: "",
-    leadTimestamp: "",
-    createdAt: "",
-    mobileNumber: "",
-    alternateNumber: "",
-    callerName: "",
-    patientName: "",
-    patientAge: "",
-    spouseName: "",
-    spouseAge: "",
-    location: "",
-    otherCity: "",
-    lookingForTreatment: "",
-    preConditions: "",
-    surgeryDetails: "",
-    treatmentRequirements: "",
-    referredBy: "",
-    leadSource: "",
-    followUpDate: "",
-    subDispositions: "",
-    dispositions: "",
-    validStatus: "",
+    firstActivityDate: "",
+    husbandName: "",
+    wifeName: "",
+    husbandAge: "",
+    wifeAge: "",
+    whenPlanningToStartTreatment: "",
+    preMedicalConditions: "No",
+    marriedSince: "",
+    tryingToConceiveYears: "",
+    primaryEmail: "",
+    secondaryEmail: "",
+    primaryMobileNumber: "",
+    secondaryMobileNumber: "",
+    whatsappMobileNumber: "",
+    otherNumbers: "",
+    whatsappConsent: "No",
+    callingConsent: "No",
+    leadSource: "General",
+    utmSource: "",
+    campaignName: "General",
+    sourceName: "",
+    source: "General",
+    leadScore: "0",
+    subStatus: "",
+    leadStage: "",
+    leadValidStatus: "",
+    createdByMember: "",
+    createdOn: "",
+    modifiedByMember: "",
+    modifiedOn: "",
+    centreAddress: "",
+    ptAddress: "",
+    ptPincode: "",
+    ptCountry: "India",
+    ptState: "",
+    ptCity: "",
+    leadOwner: "",
+    leadAge: "0 days",
+    campLocation: "",
+    centreLocation: "",
+    followUpDateTime: "",
+    centreVisitedDate: "",
+    campVisitedDate: "",
     appointmentDate: "",
-    appointmentMonth: "",
-    teleconsultationSlot: "",
-    consultationCharges: "",
+    registrationStatus: "No",
+    registrationNumber: "",
+    registrationAmount: "",
+    package: "",
+    plan: "",
     notes: "",
-    surgeryPaymentReceived: "",
-    surgeryCost: "",
-    surgeryDate: "",
   });
 
-  // State for inline Other Location & Treatment
-  const [selectedLocationOption, setSelectedLocationOption] = useState<string>("");
-  const [otherLocationText, setOtherLocationText] = useState<string>("");
-  const [selectedTreatmentOption, setSelectedTreatmentOption] = useState<string>("");
-  const [otherTreatmentText, setOtherTreatmentText] = useState<string>("");
+  const applyLeadData = (l: any) => {
+    // Phone splits
+    const pPhone = splitPhone(l.primaryMobileNumber || l.mobileNumber || l.phoneNumber);
+    setPrimaryCountryCode(pPhone.code);
+    setPrimaryRawPhone(pPhone.raw);
 
-  // Populate from client-side memory cache immediately (instant render without waiting for network)
+    const sPhone = splitPhone(l.secondaryMobileNumber || l.alternateNumber);
+    setSecondaryCountryCode(sPhone.code);
+    setSecondaryRawPhone(sPhone.raw);
+
+    const wPhone = splitPhone(l.whatsappMobileNumber);
+    setWhatsappCountryCode(wPhone.code);
+    setWhatsappRawPhone(wPhone.raw);
+
+    const oPhone = splitPhone(l.otherNumbers);
+    setOtherCountryCode(oPhone.code);
+    setOtherRawPhone(oPhone.raw);
+
+    setFormData({
+      uniqueId: l.uniqueId || "",
+      firstActivityDate: l.firstActivityDate || l.createdOn || l.leadTimestamp || "",
+      husbandName: l.husbandName || l.spouseName || "",
+      wifeName: l.wifeName || l.patientName || "",
+      husbandAge: l.husbandAge || l.spouseAge || "",
+      wifeAge: l.wifeAge || l.patientAge || "",
+      whenPlanningToStartTreatment: l.whenPlanningToStartTreatment || l.lookingForTreatment || "",
+      preMedicalConditions: l.preMedicalConditions || (l.preConditions ? "Yes" : "No"),
+      marriedSince: l.marriedSince || "",
+      tryingToConceiveYears: l.tryingToConceiveYears || "",
+      primaryEmail: l.primaryEmail || "",
+      secondaryEmail: l.secondaryEmail || "",
+      primaryMobileNumber: l.primaryMobileNumber || l.mobileNumber || l.phoneNumber || "",
+      secondaryMobileNumber: l.secondaryMobileNumber || l.alternateNumber || "",
+      whatsappMobileNumber: l.whatsappMobileNumber || "",
+      otherNumbers: l.otherNumbers || "",
+      whatsappConsent: l.whatsappConsent || "No",
+      callingConsent: l.callingConsent || "No",
+      leadSource: l.leadSource || l.utmSource || "General",
+      utmSource: l.utmSource || l.leadSource || "",
+      campaignName: l.campaignName || "General",
+      sourceName: l.sourceName || "",
+      source: l.source || "General",
+      leadScore: l.leadScore || "0",
+      subStatus: l.subStatus || l.subDispositions || "",
+      leadStage: l.leadStage || l.dispositions || "",
+      leadValidStatus: l.leadValidStatus || l.validStatus || "",
+      createdByMember: l.createdByMember || (typeof l.createdBy === "object" ? l.createdBy?.name : l.createdBy) || "",
+      createdOn: l.createdOn || l.leadTimestamp || l.date || "",
+      modifiedByMember: l.modifiedByMember || "",
+      modifiedOn: l.modifiedOn || "",
+      centreAddress: l.centreAddress || "",
+      ptAddress: l.ptAddress || "",
+      ptPincode: l.ptPincode || "",
+      ptCountry: l.ptCountry || "India",
+      ptState: l.ptState || "",
+      ptCity: l.ptCity || "",
+      leadOwner: l.leadOwner || l.callerName || "",
+      leadAge: l.leadAge || "0 days",
+      campLocation: l.campLocation || "",
+      centreLocation: l.centreLocation || l.location || l.otherCity || "",
+      followUpDateTime: l.followUpDateTime || l.followUpDate || "",
+      centreVisitedDate: l.centreVisitedDate || "",
+      campVisitedDate: l.campVisitedDate || "",
+      appointmentDate: l.appointmentDate || "",
+      registrationStatus: l.registrationStatus || "No",
+      registrationNumber: l.registrationNumber || "",
+      registrationAmount: l.registrationAmount || "",
+      package: l.package || "",
+      plan: l.plan || "",
+      notes: "", // keep clean for new remarks entry
+    });
+
+    if (l.customFields) {
+      setCustomFieldValues(l.customFields);
+    }
+    if (l.auditLogs) {
+      setAuditLogs(l.auditLogs);
+    }
+    if (l.notesHistory) {
+      setNotesHistory(l.notesHistory);
+    }
+  };
+
   useEffect(() => {
     const cachedLead = getCachedLeadDetail(leadId);
     if (cachedLead) {
@@ -113,90 +257,9 @@ export default function LeadDetailPage({
     }
   }, [leadId]);
 
-  const applyLeadData = (l: any) => {
-    const locVal = l.location || "";
-    const otherLocVal = l.otherCity || "";
-    if (locVal && !LOCATIONS.includes(locVal as any)) {
-      setSelectedLocationOption("Other");
-      setOtherLocationText(locVal);
-    } else if (locVal === "Other") {
-      setSelectedLocationOption("Other");
-      setOtherLocationText(otherLocVal);
-    } else {
-      setSelectedLocationOption(locVal);
-      setOtherLocationText("");
-    }
-
-    const treatVal = l.lookingForTreatment || l.treatment || "";
-    if (treatVal && !TREATMENTS.includes(treatVal as any)) {
-      setSelectedTreatmentOption("Other");
-      setOtherTreatmentText(treatVal);
-    } else if (treatVal === "Other") {
-      setSelectedTreatmentOption("Other");
-      setOtherTreatmentText("");
-    } else {
-      setSelectedTreatmentOption(treatVal);
-      setOtherTreatmentText("");
-    }
-
-    setFormData({
-      uniqueId: l.uniqueId || "",
-      date: l.date || l.dateOfLead || "",
-      month: l.month || "",
-      leadTimestamp:
-        l.leadTimestamp ||
-        (l.createdAt
-          ? new Date(l.createdAt).toLocaleString("en-IN", {
-              day: "2-digit",
-              month: "short",
-              year: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-            })
-          : ""),
-      createdAt: l.createdAt || "",
-      mobileNumber: l.mobileNumber || l.phoneNumber || "",
-      alternateNumber: l.alternateNumber || "",
-      callerName: l.callerName || "",
-      patientName: l.patientName || "",
-      patientAge: l.patientAge || "",
-      spouseName: l.spouseName || "",
-      spouseAge: l.spouseAge || "",
-      location: locVal,
-      otherCity: otherLocVal,
-      lookingForTreatment: treatVal,
-      preConditions: l.preConditions || l.preCondition || "",
-      surgeryDetails: l.surgeryDetails || l.surgicalData || "",
-      treatmentRequirements:
-        l.treatmentRequirements || l.treatmentRequired || "",
-      referredBy: l.referredBy || "",
-      leadSource: l.leadSource || "",
-      followUpDate: l.followUpDate || l.followUpDates || "",
-      subDispositions: l.subDispositions || l.subDisposition || "",
-      dispositions: l.dispositions || l.disposition || "",
-      validStatus: l.validStatus || "",
-      appointmentDate: l.appointmentDate || "",
-      appointmentMonth: l.appointmentMonth || "",
-      teleconsultationSlot:
-        l.teleconsultationSlot || l.appointmentSlot || "",
-      consultationCharges:
-        l.consultationCharges || l.teleConsultationCharges || "",
-      notes: l.notes || "",
-      surgeryPaymentReceived:
-        l.surgeryPaymentReceived || l.surgeryReceipt || "",
-      surgeryCost: l.surgeryCost || "",
-      surgeryDate: l.surgeryDate || "",
-    });
-    if (l.customFields) setCustomFieldValues(l.customFields);
-    if (l.auditLogs) setAuditLogs(l.auditLogs);
-    if (l.notesHistory) setNotesHistory(l.notesHistory);
-  };
-
   useEffect(() => {
     async function loadData() {
       try {
-        // Parallel execution of Auth, Form Config, Members, and Lead details
         const [meRes, cfgRes, membersRes, leadRes] = await Promise.all([
           fetch("/api/auth/me"),
           fetch("/api/admin/form-config").catch(() => null),
@@ -222,19 +285,12 @@ export default function LeadDetailPage({
           }
           if (cfgData.config?.subDispositionMappings && Object.keys(cfgData.config.subDispositionMappings).length > 0) {
             setSubDispositionMappings(cfgData.config.subDispositionMappings);
-          } else {
-            const subDispField = (cfgData.config?.fields || []).find((f: any) => f.id === "subDispositions");
-            if (subDispField?.subDispositionMappings && Object.keys(subDispField.subDispositionMappings).length > 0) {
-              setSubDispositionMappings(subDispField.subDispositionMappings);
-            }
           }
         }
 
         if (membersRes && membersRes.ok) {
           const mData = await membersRes.json();
-          const names = (mData.members || [])
-            .map((m: any) => m.name)
-            .filter(Boolean);
+          const names = (mData.members || []).map((m: any) => m.name).filter(Boolean);
           setCallerOptions(names);
         }
 
@@ -255,15 +311,8 @@ export default function LeadDetailPage({
     loadData();
   }, [leadId, router]);
 
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/admin/login");
-  };
-
   const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev: any) => ({
@@ -272,115 +321,120 @@ export default function LeadDetailPage({
     }));
   };
 
-  const handlePhoneChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: "mobileNumber" | "alternateNumber"
-  ) => {
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 10);
+  // Auto-calculate Lead Score based on the 6 clinical/demographic criteria
+  useEffect(() => {
+    const score = calculateLeadScore({
+      husbandAge: formData.husbandAge,
+      wifeAge: formData.wifeAge,
+      preMedicalConditions: formData.preMedicalConditions,
+      marriedSince: formData.marriedSince,
+      tryingToConceiveYears: formData.tryingToConceiveYears,
+      whenPlanningToStartTreatment: formData.whenPlanningToStartTreatment,
+    });
+    setFormData((prev: any) => (prev.leadScore !== score ? { ...prev, leadScore: score } : prev));
+  }, [
+    formData.husbandAge,
+    formData.wifeAge,
+    formData.preMedicalConditions,
+    formData.marriedSince,
+    formData.tryingToConceiveYears,
+    formData.whenPlanningToStartTreatment,
+  ]);
+
+  const handleCampaignNameChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const camp = e.target.value;
+    const mapping = CAMPAIGN_TO_INFO[camp];
     setFormData((prev: any) => ({
       ...prev,
-      [field]: raw,
+      campaignName: camp,
+      source: mapping?.source || prev.source,
+      sourceName: mapping?.sourceName || prev.sourceName,
     }));
+  };
+
+  const handleSourceNameChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sName = e.target.value;
+    const mapping = SOURCE_NAME_TO_INFO[sName];
+    setFormData((prev: any) => ({
+      ...prev,
+      sourceName: sName,
+      campaignName: mapping?.campaignName || prev.campaignName,
+      source: mapping?.source || prev.source,
+    }));
+  };
+
+  const handleCampLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const camp = e.target.value;
+    if (camp === "NA") {
+      // If NA is selected, do not autofill centre location, let user manually choose
+      setFormData((prev: any) => ({
+        ...prev,
+        campLocation: camp,
+        centreLocation: "",
+        centreAddress: "",
+      }));
+    } else if (CAMP_TO_CENTRE_MAP[camp]) {
+      const centre = CAMP_TO_CENTRE_MAP[camp];
+      setFormData((prev: any) => ({
+        ...prev,
+        campLocation: camp,
+        centreLocation: centre,
+        centreAddress: centre ? `${centre} Centre Location Link` : prev.centreAddress,
+      }));
+    } else {
+      setFormData((prev: any) => ({
+        ...prev,
+        campLocation: camp,
+      }));
+    }
+  };
+
+  const handleCentreLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const centre = e.target.value;
+    setFormData((prev: any) => ({
+      ...prev,
+      centreLocation: centre,
+      centreAddress: centre ? `${centre} Centre Location Link` : "",
+    }));
+  };
+
+  const handleSubStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sub = e.target.value;
+    const mapping =
+      subDispositionMappings[sub] ||
+      SUB_DISPOSITIONS_MAP[sub] || {
+        disposition: "",
+        validStatus: "",
+      };
+
+    setFormData((prev: any) => {
+      const updated: any = {
+        ...prev,
+        subStatus: sub,
+        leadStage: mapping.disposition,
+        leadValidStatus: mapping.validStatus,
+      };
+      if (mapping.disposition === "Converted" || mapping.disposition === "Closed") {
+        updated.followUpDateTime = "";
+      }
+      return updated;
+    });
   };
 
   const handleAgeChange = (
     e: React.ChangeEvent<HTMLInputElement>,
-    field: "patientAge" | "spouseAge"
+    field: "husbandAge" | "wifeAge"
   ) => {
     const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
-    setFormData((prev: any) => ({
-      ...prev,
-      [field]: raw,
-    }));
+    setFormData((prev: any) => ({ ...prev, [field]: raw }));
   };
 
-  const handleDateChange = (
+  const handleNumberOnlyChange = (
     e: React.ChangeEvent<HTMLInputElement>,
-    dateField: "date" | "followUpDate" | "appointmentDate" | "surgeryDate",
-    monthField?: "month" | "appointmentMonth"
+    field: "marriedSince" | "tryingToConceiveYears"
   ) => {
-    const isoVal = e.target.value;
-    if (!isoVal) {
-      setFormData((prev: any) => ({
-        ...prev,
-        [dateField]: "",
-        ...(monthField ? { [monthField]: "" } : {}),
-      }));
-      return;
-    }
-    const formatted = formatDateToDDMMMYY(isoVal);
-    const mmmYY = getMonthFromDate(isoVal);
-
-    setFormData((prev: any) => ({
-      ...prev,
-      [dateField]: formatted,
-      ...(monthField ? { [monthField]: mmmYY } : {}),
-    }));
-  };
-
-  // Location dropdown change handler
-  const handleLocationOptionChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const val = e.target.value;
-    setSelectedLocationOption(val);
-    if (val === "Other") {
-      setFormData((prev: any) => ({
-        ...prev,
-        location: otherLocationText,
-        otherCity: otherLocationText,
-      }));
-    } else {
-      setOtherLocationText("");
-      setFormData((prev: any) => ({
-        ...prev,
-        location: val,
-        otherCity: "",
-      }));
-    }
-  };
-
-  const handleOtherLocationTextChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const text = e.target.value;
-    setOtherLocationText(text);
-    setFormData((prev: any) => ({
-      ...prev,
-      location: text,
-      otherCity: text,
-    }));
-  };
-
-  // Treatment dropdown change handler
-  const handleTreatmentOptionChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const val = e.target.value;
-    setSelectedTreatmentOption(val);
-    if (val === "Other") {
-      setFormData((prev: any) => ({
-        ...prev,
-        lookingForTreatment: otherTreatmentText,
-      }));
-    } else {
-      setOtherTreatmentText("");
-      setFormData((prev: any) => ({
-        ...prev,
-        lookingForTreatment: val,
-      }));
-    }
-  };
-
-  const handleOtherTreatmentTextChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const text = e.target.value;
-    setOtherTreatmentText(text);
-    setFormData((prev: any) => ({
-      ...prev,
-      lookingForTreatment: text,
-    }));
+    const raw = e.target.value.replace(/\D/g, "");
+    setFormData((prev: any) => ({ ...prev, [field]: raw }));
   };
 
   const handleCustomFieldChange = (fieldId: string, value: any) => {
@@ -390,130 +444,26 @@ export default function LeadDetailPage({
     }));
   };
 
-  const renderDynamicSectionFields = (sectionId: 1 | 2 | 3 | 4) => {
-    const customFieldsInSec = formFields.filter(
-      (f) => f.section === sectionId && !f.isSystem && f.enabled !== false
-    );
-    if (customFieldsInSec.length === 0) return null;
-
-    return (
-      <div className="pt-3 border-t border-slate-200 mt-4">
-        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-2">
-          Custom Added Fields
-        </span>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {customFieldsInSec.map((f) => (
-            <div key={f.id} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
-              <label className="block text-xs font-semibold text-black mb-1.5">
-                {f.label} {f.required && <span className="text-rose-600">*</span>}
-              </label>
-
-              {f.type === "select" ? (
-                <select
-                  required={f.required}
-                  value={customFieldValues[f.id] || ""}
-                  onChange={(e) => handleCustomFieldChange(f.id, e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                >
-                  <option value="">Select {f.label}</option>
-                  {(f.options || []).map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              ) : f.type === "textarea" ? (
-                <textarea
-                  rows={2}
-                  required={f.required}
-                  placeholder={f.placeholder || `Enter ${f.label}`}
-                  value={customFieldValues[f.id] || ""}
-                  onChange={(e) => handleCustomFieldChange(f.id, e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                />
-              ) : f.type === "checkbox" ? (
-                <div className="pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-black">
-                    <input
-                      type="checkbox"
-                      required={f.required}
-                      checked={Boolean(customFieldValues[f.id])}
-                      onChange={(e) => handleCustomFieldChange(f.id, e.target.checked)}
-                      className="w-4 h-4 rounded text-[#cc2727] focus:ring-[#cc2727]"
-                    />
-                    <span>{f.placeholder || f.label}</span>
-                  </label>
-                </div>
-              ) : f.type === "date" || f.type === "month" || f.type === "time" || f.type === "datetime-local" ? (
-                <input
-                  type={f.type}
-                  required={f.required}
-                  value={customFieldValues[f.id] || ""}
-                  onChange={(e) => handleCustomFieldChange(f.id, e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] [color-scheme:light]"
-                />
-              ) : (
-                <input
-                  type={f.type}
-                  required={f.required}
-                  placeholder={f.placeholder || `Enter ${f.label}`}
-                  value={customFieldValues[f.id] || ""}
-                  onChange={(e) => handleCustomFieldChange(f.id, e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const handleSubDispositionChange = (
-    e: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    const sub = e.target.value;
-    const mapping =
-      subDispositionMappings[sub] ||
-      SUB_DISPOSITIONS_MAP[sub] || {
-        disposition: "",
-        validStatus: "",
-      };
-
-    setFormData((prev: any) => ({
-      ...prev,
-      subDispositions: sub,
-      dispositions: mapping.disposition,
-      validStatus: mapping.validStatus,
-    }));
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError("");
 
-    const finalLocation =
-      selectedLocationOption === "Other"
-        ? otherLocationText
-        : selectedLocationOption;
-    const finalTreatment =
-      selectedTreatmentOption === "Other"
-        ? otherTreatmentText
-        : selectedTreatmentOption;
-
     try {
+      const primaryFull = primaryRawPhone ? `${primaryCountryCode} ${primaryRawPhone}`.trim() : "";
+      const secondaryFull = secondaryRawPhone ? `${secondaryCountryCode} ${secondaryRawPhone}`.trim() : "";
+      const whatsappFull = whatsappRawPhone ? `${whatsappCountryCode} ${whatsappRawPhone}`.trim() : "";
+      const otherFull = otherRawPhone ? `${otherCountryCode} ${otherRawPhone}`.trim() : "";
+
       const res = await fetch(`/api/admin/leads/${leadId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          location: finalLocation,
-          otherCity: selectedLocationOption === "Other" ? otherLocationText : "",
-          lookingForTreatment: finalTreatment,
-          treatment: finalTreatment, // keep legacy field in sync
-          phoneNumber: formData.mobileNumber, // keep legacy field in sync
-          dateOfLead: formData.date,
+          primaryMobileNumber: primaryFull,
+          secondaryMobileNumber: secondaryFull,
+          whatsappMobileNumber: whatsappFull,
+          otherNumbers: otherFull,
           customFields: customFieldValues,
         }),
       });
@@ -529,7 +479,7 @@ export default function LeadDetailPage({
       if (data.lead?.notesHistory) {
         setNotesHistory(data.lead.notesHistory);
       }
-      // Blank out Section 5 notes field as requested
+
       setFormData((prev: any) => ({
         ...prev,
         notes: "",
@@ -567,6 +517,64 @@ export default function LeadDetailPage({
     }
   };
 
+  const renderDynamicSectionFields = (sectionId: 1 | 2 | 3 | 4) => {
+    const customFieldsInSec = formFields.filter(
+      (f) => f.section === sectionId && !f.isSystem && f.enabled !== false
+    );
+    if (customFieldsInSec.length === 0) return null;
+
+    return (
+      <div className="pt-3 border-t border-slate-200 mt-4">
+        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-2">
+          Custom Added Fields
+        </span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {customFieldsInSec.map((f) => (
+            <div key={f.id} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
+              <label className="block text-xs font-semibold text-black mb-1.5">
+                {f.label} {f.required && <span className="text-rose-600">*</span>}
+              </label>
+
+              {f.type === "select" ? (
+                <select
+                  required={f.required}
+                  value={customFieldValues[f.id] || ""}
+                  onChange={(e) => handleCustomFieldChange(f.id, e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                >
+                  <option value="">Select {f.label}</option>
+                  {(f.options || []).map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              ) : f.type === "textarea" ? (
+                <textarea
+                  required={f.required}
+                  rows={3}
+                  value={customFieldValues[f.id] || ""}
+                  onChange={(e) => handleCustomFieldChange(f.id, e.target.value)}
+                  placeholder={f.placeholder || ""}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] resize-none"
+                />
+              ) : (
+                <input
+                  required={f.required}
+                  type={f.type || "text"}
+                  value={customFieldValues[f.id] || ""}
+                  onChange={(e) => handleCustomFieldChange(f.id, e.target.value)}
+                  placeholder={f.placeholder || ""}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -576,48 +584,49 @@ export default function LeadDetailPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-black flex">
-      {/* Sidebar */}
-      <AdminSidebar user={user} onLogout={handleLogout} />
+    <div className="min-h-screen bg-slate-50 flex">
+      <AdminSidebar activeTab="leads" user={user} onLogout={() => router.push("/admin/login")} />
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 pb-16">
         {/* Top Header */}
-        <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
+        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               href="/admin/leads"
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-black hover:text-black transition-colors flex items-center gap-1.5 text-xs font-semibold"
+              className="p-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Back to Leads</span>
             </Link>
-            <div className="h-5 w-px bg-slate-200" />
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-bold text-[#cc2727] bg-[#cc2727]/10 px-2.5 py-0.5 rounded-lg border border-[#cc2727]/20">
-                {formData.uniqueId || leadId}
-              </span>
-              <h1 className="text-sm sm:text-base font-bold text-black truncate max-w-[200px] sm:max-w-md">
-                {formData.patientName || "Patient Details"}
-              </h1>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold text-black">
+                  {formData.wifeName || formData.husbandName || "Lead Details"}
+                </h1>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20 font-mono font-bold">
+                  {formData.uniqueId}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Lead ID: <span className="font-mono font-bold text-[#cc2727]">{formData.uniqueId || "N/A"}</span> | Created: {formData.createdOn || "-"}
+              </p>
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => setIsConfirmDeleteOpen(true)}
-              className="py-2 px-3.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-xs font-semibold rounded-xl flex items-center gap-1.5 transition-colors"
+              className="py-2 px-3 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Delete</span>
             </button>
 
             <button
+              type="button"
               onClick={handleSave}
               disabled={saving}
-              className="py-2 px-4 bg-[#cc2727] hover:bg-[#b02121] text-black text-xs font-semibold rounded-xl flex items-center gap-2 shadow-lg shadow-[#cc2727]/20 transition-all active:scale-95 disabled:opacity-50"
+              className="py-2 px-4 bg-[#cc2727] hover:bg-[#b02121] text-white text-xs font-semibold rounded-xl flex items-center gap-2 shadow-lg shadow-[#cc2727]/20 transition-all active:scale-95 disabled:opacity-50"
             >
               {saving ? (
                 <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -629,17 +638,15 @@ export default function LeadDetailPage({
           </div>
         </header>
 
-        {/* Form Body - Two-column responsive layout (Form Left, Audit History Right) */}
+        {/* Form Body */}
         <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] w-full mx-auto">
-          {/* Toast Message */}
           {toastMessage && (
-            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-3 animate-in fade-in">
               <CheckCircle className="w-5 h-5 shrink-0" />
               <span className="text-sm font-medium">{toastMessage}</span>
             </div>
           )}
 
-          {/* Error Message */}
           {error && (
             <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-3">
               <AlertCircle className="w-5 h-5 shrink-0" />
@@ -647,664 +654,893 @@ export default function LeadDetailPage({
             </div>
           )}
 
-          {/* Header Card with Patient Overview */}
+          {/* Patient Overview Summary */}
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#cc2727]/20 text-[#cc2727] border border-indigo-500/30 flex items-center justify-center font-extrabold text-2xl uppercase shadow-lg shadow-indigo-500/10 shrink-0">
-                {formData.patientName ? formData.patientName.charAt(0) : "P"}
+              <div className="w-16 h-16 rounded-2xl bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20 flex items-center justify-center font-extrabold text-2xl uppercase shrink-0">
+                {formData.wifeName ? formData.wifeName.charAt(0) : "W"}
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-bold text-black">
-                    {formData.patientName || "Unnamed Patient"}
+                    {formData.wifeName} {formData.husbandName ? `& ${formData.husbandName}` : ""}
                   </h2>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20 font-mono font-bold">
-                    {formData.uniqueId}
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono font-bold">
+                    Age: {formData.wifeAge || "-"} / {formData.husbandAge || "-"}
                   </span>
-                  {formData.validStatus && (
-                    <span
-                      className={`text-xs px-2.5 py-0.5 rounded-full border font-semibold ${
-                        formData.validStatus === "Valid"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/20"
-                          : "bg-rose-500/10 text-rose-300 border-rose-500/20"
-                      }`}
-                    >
-                      {formData.validStatus}
-                    </span>
-                  )}
                 </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <Phone className="w-3.5 h-3.5 text-gray-600" />
-                    {formData.mobileNumber || "No phone"}
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-slate-600">
+                  <span className="font-mono font-semibold text-slate-800">
+                    📞 {formData.primaryMobileNumber || "-"}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-gray-600" />
-                    {formData.location || formData.otherCity || "No location"}
-                  </span>
-                  <span className="flex items-center gap-1 font-mono text-[#cc2727]">
-                    <Clock className="w-3.5 h-3.5 text-[#cc2727]" />
-                    Added: {formData.leadTimestamp || formData.date || "N/A"}
+                  <span>📍 {formData.centreLocation || "Centre Not Assigned"}</span>
+                  <span className="font-semibold text-indigo-700">
+                    ⏱️ Age: {formData.leadAge || "0 days"}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="text-right sm:self-center">
-              <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-1">
-                View & Edit Mode
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-3 py-1 rounded-lg font-bold bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                Stage: {formData.leadStage || "Pending"}
               </span>
-              <p className="text-xs text-gray-600">
-                Directly edit any field and click Save Changes.
-              </p>
+              <span className="text-xs px-3 py-1 rounded-lg font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                Status: {formData.leadValidStatus || "NA"}
+              </span>
             </div>
           </div>
 
-          {/* Two Column Grid: Left Side Form (8 cols), Right Side Change History (4 cols) */}
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-            {/* Left Column: Patient Edit Form */}
-            <div className="xl:col-span-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 cols: Main Form */}
+            <div className="lg:col-span-2 space-y-6">
               <form onSubmit={handleSave} className="space-y-6">
-            {/* Section 1: Lead Date, Contact & Caller */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-              <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
-                <Hash className="w-4 h-4 text-[#cc2727]" />
-                <h3 className="text-sm font-bold text-black uppercase tracking-wider">
-                  1. Lead Date, Contact & Caller
-                </h3>
-              </div>
+                {/* Section 1: Lead Identification & Overview */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#cc2727]" />
+                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
+                      1. Lead Identification & Overview
+                    </h3>
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Unique ID */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Unique ID
-                  </label>
-                  <input
-                    type="text"
-                    name="uniqueId"
-                    value={formData.uniqueId}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Unique ID / Lead ID */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Lead ID
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={formData.uniqueId}
+                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-[#cc2727] text-xs font-mono font-bold cursor-not-allowed"
+                      />
+                    </div>
+
+                    {/* First Activity Date */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        First Activity Date
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={formData.firstActivityDate ? new Date(formData.firstActivityDate).toLocaleString() : "Auto-filled"}
+                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-black text-xs font-medium cursor-not-allowed"
+                      />
+                    </div>
+
+                    {/* Lead Source / UTM Source */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Lead Source / UTM Source *
+                      </label>
+                      <select
+                        required
+                        name="leadSource"
+                        value={formData.leadSource}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        <option value="">Select Lead Source</option>
+                        {LEAD_SOURCES.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Campaign Name */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Campaign Name *
+                      </label>
+                      <select
+                        required
+                        name="campaignName"
+                        value={formData.campaignName}
+                        onChange={handleCampaignNameChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        <option value="">Select Campaign</option>
+                        {CAMPAIGN_NAMES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Source Name */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Source Name
+                      </label>
+                      <select
+                        name="sourceName"
+                        value={formData.sourceName}
+                        onChange={handleSourceNameChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        <option value="">Select Source Name</option>
+                        {SOURCE_NAMES.map((sn) => (
+                          <option key={sn} value={sn}>
+                            {sn}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Source */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Source *
+                      </label>
+                      <select
+                        required
+                        name="source"
+                        value={formData.source}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        {GENERAL_SOURCES.map((src) => (
+                          <option key={src} value={src}>
+                            {src}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Lead Score */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Lead Score *
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        name="leadScore"
+                        value={formData.leadScore}
+                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-amber-700 font-bold text-xs font-mono cursor-not-allowed"
+                      />
+                    </div>
+
+                    {/* Lead Owner */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Lead Owner *
+                      </label>
+                      <select
+                        name="leadOwner"
+                        value={formData.leadOwner}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        <option value="">Select Lead Owner</option>
+                        {callerOptions.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Lead Age */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Lead Age (Today - Created)
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={formData.leadAge}
+                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-black text-xs font-medium cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+
+                  {renderDynamicSectionFields(1)}
                 </div>
 
-                {/* Date Field (DD-MMM-YY) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5 flex items-center justify-between">
-                    <span>Date (DD-MMM-YY)</span>
-                    {formData.date && (
-                      <span className="text-[11px] font-mono text-[#cc2727]">
-                        {formData.date}
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="date"
-                    value={parseDDMMMYYToISO(formData.date)}
-                    onChange={(e) => handleDateChange(e, "date", "month")}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] [color-scheme:light]"
-                  />
+                {/* Section 2: Couple Profile & Medical Details */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-[#cc2727]" />
+                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
+                      2. Couple Profile & Medical Details
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Husband Name */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Husband Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        name="husbandName"
+                        value={formData.husbandName}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Wife Name */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Wife Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        name="wifeName"
+                        value={formData.wifeName}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Husband Age (2 digits) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Husband Age (2 Digits) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={2}
+                        value={formData.husbandAge}
+                        onChange={(e) => handleAgeChange(e, "husbandAge")}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Wife Age (2 digits) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Wife Age (2 Digits) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={2}
+                        value={formData.wifeAge}
+                        onChange={(e) => handleAgeChange(e, "wifeAge")}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* When are you planning to start treatment */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        When are you planning to start treatment
+                      </label>
+                      <select
+                        name="whenPlanningToStartTreatment"
+                        value={formData.whenPlanningToStartTreatment}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        <option value="">Select Timeline</option>
+                        {WHEN_START_TREATMENT_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Pre Medical Conditions (Yes/No) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Pre Medical Conditions *
+                      </label>
+                      <select
+                        required
+                        name="preMedicalConditions"
+                        value={formData.preMedicalConditions}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </div>
+
+                    {/* Married Since (Numbers only) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Married Since (Years) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.marriedSince}
+                        onChange={(e) => handleNumberOnlyChange(e, "marriedSince")}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* How long you are trying to conceive */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        How long you are trying to conceive (Years) *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.tryingToConceiveYears}
+                        onChange={(e) => handleNumberOnlyChange(e, "tryingToConceiveYears")}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+                  </div>
+                  {renderDynamicSectionFields(2)}
                 </div>
 
-                {/* Time Stamp (Real-Time when added) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Time Stamp (Lead Added)</span>
-                  </label>
-                  <div className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-[#cc2727] text-xs font-mono font-medium flex items-center justify-between">
-                    <span>{formData.leadTimestamp || "Not recorded"}</span>
-                    {formData.leadTimestamp && (
-                      <span className="flex h-2 w-2 relative">
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#cc2727]"></span>
-                      </span>
-                    )}
+                {/* Section 3: Contact & Address Information */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-[#cc2727]" />
+                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
+                      3. Contact & Address Information
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Primary Mobile Number (Wife) */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Primary Mobile number (Wife) *
+                      </label>
+                      <div className="flex gap-2">
+                        <select
+                          value={primaryCountryCode}
+                          onChange={(e) => setPrimaryCountryCode(e.target.value)}
+                          className="w-28 px-2 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                        >
+                          {COUNTRY_CODES.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="tel"
+                          required
+                          value={primaryRawPhone}
+                          onChange={(e) => setPrimaryRawPhone(e.target.value.replace(/\D/g, ""))}
+                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Secondary Mobile Number */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Secondary Mobile number
+                      </label>
+                      <div className="flex gap-2">
+                        <select
+                          value={secondaryCountryCode}
+                          onChange={(e) => setSecondaryCountryCode(e.target.value)}
+                          className="w-28 px-2 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                        >
+                          {COUNTRY_CODES.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="tel"
+                          value={secondaryRawPhone}
+                          onChange={(e) => setSecondaryRawPhone(e.target.value.replace(/\D/g, ""))}
+                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Whatsapp Mobile Number */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Whatsapp Mobile Number
+                      </label>
+                      <div className="flex gap-2">
+                        <select
+                          value={whatsappCountryCode}
+                          onChange={(e) => setWhatsappCountryCode(e.target.value)}
+                          className="w-28 px-2 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                        >
+                          {COUNTRY_CODES.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="tel"
+                          value={whatsappRawPhone}
+                          onChange={(e) => setWhatsappRawPhone(e.target.value.replace(/\D/g, ""))}
+                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Other Numbers */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Other Numbers
+                      </label>
+                      <div className="flex gap-2">
+                        <select
+                          value={otherCountryCode}
+                          onChange={(e) => setOtherCountryCode(e.target.value)}
+                          className="w-28 px-2 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                        >
+                          {COUNTRY_CODES.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="tel"
+                          value={otherRawPhone}
+                          onChange={(e) => setOtherRawPhone(e.target.value.replace(/\D/g, ""))}
+                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Primary Email */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Primary Email (Pt Email)
+                      </label>
+                      <input
+                        type="email"
+                        name="primaryEmail"
+                        value={formData.primaryEmail}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Secondary Email */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Secondary Email (Spouse)
+                      </label>
+                      <input
+                        type="email"
+                        name="secondaryEmail"
+                        value={formData.secondaryEmail}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Whatsapp Consent */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Whatsapp Consent
+                      </label>
+                      <select
+                        name="whatsappConsent"
+                        value={formData.whatsappConsent}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </div>
+
+                    {/* Calling Consent */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Calling Consent
+                      </label>
+                      <select
+                        name="callingConsent"
+                        value={formData.callingConsent}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </div>
+
+                    {/* Pt Address */}
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Pt Address
+                      </label>
+                      <input
+                        type="text"
+                        name="ptAddress"
+                        value={formData.ptAddress}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Pt Pincode */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Pt Pincode
+                      </label>
+                      <input
+                        type="text"
+                        name="ptPincode"
+                        value={formData.ptPincode}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Pt Country */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Pt Country
+                      </label>
+                      <input
+                        type="text"
+                        name="ptCountry"
+                        value={formData.ptCountry}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Pt State */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Pt State
+                      </label>
+                      <input
+                        type="text"
+                        name="ptState"
+                        value={formData.ptState}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Pt City */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Pt City
+                      </label>
+                      <input
+                        type="text"
+                        name="ptCity"
+                        value={formData.ptCity}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+                  </div>
+                  {renderDynamicSectionFields(3)}
+                </div>
+
+                {/* Section 4: Disposition, Centre, Visits & Registration */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
+                    <Building className="w-4 h-4 text-[#cc2727]" />
+                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
+                      4. Disposition, Centre, Visits & Registration
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Sub Status */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Sub Status *
+                      </label>
+                      <select
+                        required
+                        name="subStatus"
+                        value={formData.subStatus}
+                        onChange={handleSubStatusChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] font-semibold"
+                      >
+                        <option value="">Select Sub Status</option>
+                        {Object.keys(SUB_DISPOSITIONS_MAP).map((sub) => (
+                          <option key={sub} value={sub}>
+                            {sub}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Lead Stage (Autofilled) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Lead Stage (Autofilled)
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={formData.leadStage}
+                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-[#cc2727] font-bold text-xs cursor-not-allowed"
+                      />
+                    </div>
+
+                    {/* Lead Valid Status (Autofilled) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Lead Valid Status (Autofilled)
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={formData.leadValidStatus}
+                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-slate-800 font-bold text-xs cursor-not-allowed"
+                      />
+                    </div>
+
+                    {/* Camp Location */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Camp Location (Optional)
+                      </label>
+                      <select
+                        name="campLocation"
+                        value={formData.campLocation}
+                        onChange={handleCampLocationChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        <option value="">Select Camp Location</option>
+                        {CAMP_LOCATIONS.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Centre Location */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Centre Location *
+                      </label>
+                      <select
+                        required
+                        name="centreLocation"
+                        value={formData.centreLocation}
+                        onChange={handleCentreLocationChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] font-semibold"
+                      >
+                        <option value="">Select Centre</option>
+                        {CENTRE_LOCATIONS.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Centre Address */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Centre Address *
+                      </label>
+                      <input
+                        type="text"
+                        name="centreAddress"
+                        value={formData.centreAddress}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Follow Up Date and Time */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Follow Up Date and Time
+                      </label>
+                      <input
+                        type="datetime-local"
+                        name="followUpDateTime"
+                        value={formData.followUpDateTime}
+                        onChange={handleChange}
+                        disabled={formData.leadStage === "Converted" || formData.leadStage === "Closed"}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] disabled:bg-slate-100 disabled:cursor-not-allowed"
+                      />
+                    </div>
+
+                    {/* Appointment Date */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Appointment Date
+                      </label>
+                      <input
+                        type="date"
+                        name="appointmentDate"
+                        value={formData.appointmentDate}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Centre Visited Date */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Centre Visited Date {(formData.subStatus === "Visited Centre" || formData.subStatus === "Visited at Centre") && <span className="text-rose-600">*</span>}
+                      </label>
+                      <input
+                        type="date"
+                        name="centreVisitedDate"
+                        required={(formData.subStatus === "Visited Centre" || formData.subStatus === "Visited at Centre")}
+                        value={formData.centreVisitedDate}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Camp Visited Date */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Camp Visited Date {(formData.subStatus === "Visited Camp" || formData.subStatus === "Visited at Camp") && <span className="text-rose-600">*</span>}
+                      </label>
+                      <input
+                        type="date"
+                        name="campVisitedDate"
+                        required={(formData.subStatus === "Visited Camp" || formData.subStatus === "Visited at Camp")}
+                        value={formData.campVisitedDate}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Registration Status */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Registration Status
+                      </label>
+                      <select
+                        name="registrationStatus"
+                        value={formData.registrationStatus}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      >
+                        <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                      </select>
+                    </div>
+
+                    {/* Registration Number */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Registration Number
+                      </label>
+                      <input
+                        type="text"
+                        name="registrationNumber"
+                        value={formData.registrationNumber}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Registration Amount */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Registration Amount
+                      </label>
+                      <input
+                        type="text"
+                        name="registrationAmount"
+                        value={formData.registrationAmount}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Package */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Package
+                      </label>
+                      <input
+                        type="text"
+                        name="package"
+                        value={formData.package}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+
+                    {/* Plan */}
+                    <div>
+                      <label className="block text-xs font-semibold text-black mb-1.5">
+                        Plan
+                      </label>
+                      <input
+                        type="text"
+                        name="plan"
+                        value={formData.plan}
+                        onChange={handleChange}
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                      />
+                    </div>
+                  </div>
+                  {renderDynamicSectionFields(4)}
+                </div>
+
+                {/* Section 5: Notes & Observations */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                  <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-[#cc2727]" />
+                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
+                      5. Notes & Observations *
+                    </h3>
+                  </div>
+                  <div>
+                    <textarea
+                      name="notes"
+                      rows={4}
+                      value={formData.notes}
+                      onChange={handleChange}
+                      placeholder="Add new patient remarks, call observations or internal notes..."
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] resize-none"
+                    />
                   </div>
                 </div>
 
-                {/* Mobile Number (10 digits) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Mobile Number (10 digits)
-                  </label>
-                  <input
-                    type="tel"
-                    maxLength={10}
-                    name="mobileNumber"
-                    value={formData.mobileNumber}
-                    onChange={(e) => handlePhoneChange(e, "mobileNumber")}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-
-                {/* Alternate # (10 digits) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Alternate # (10 digits)
-                  </label>
-                  <input
-                    type="tel"
-                    maxLength={10}
-                    name="alternateNumber"
-                    value={formData.alternateNumber}
-                    onChange={(e) => handlePhoneChange(e, "alternateNumber")}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-
-                {/* Caller Name (Drop Down) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Caller Name (Drop Down)
-                  </label>
-                  <select
-                    name="callerName"
-                    value={formData.callerName}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
+                {/* Bottom Save Bar */}
+                <div className="flex items-center justify-between p-4 bg-white/90 border border-slate-200 rounded-2xl sticky bottom-4 z-20 backdrop-blur-md shadow-sm">
+                  <span className="text-xs text-gray-500">
+                    Modified: <span className="font-mono text-black font-semibold">{formData.modifiedOn || "Not modified yet"}</span>
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="py-2.5 px-6 bg-[#cc2727] hover:bg-[#b02121] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-[#cc2727]/25 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    <option value="">Select Caller Name</option>
-                    {callerOptions.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                    {(formFields.find((f) => f.id === "callerName")?.options || ["Self / Direct Call", "Front Desk"])
-                      .filter((opt) => !callerOptions.includes(opt))
-                      .map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-
-                {/* Lead Source (Drop Down) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Lead Source (Drop Down)
-                  </label>
-                  <select
-                    name="leadSource"
-                    value={formData.leadSource}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  >
-                    <option value="">Select Lead Source</option>
-                    {(formFields.find((f) => f.id === "leadSource")?.options || LEAD_SOURCES).map((source) => (
-                      <option key={source} value={source}>
-                        {source}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Referred By (Free text) */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Referred By (Free text)
-                  </label>
-                  <input
-                    type="text"
-                    name="referredBy"
-                    value={formData.referredBy}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-              </div>
-              {renderDynamicSectionFields(1)}
-            </div>
-
-            {/* Section 2: Patient & Family Profile */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-              <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
-                <User className="w-4 h-4 text-[#cc2727]" />
-                <h3 className="text-sm font-bold text-black uppercase tracking-wider">
-                  2. Patient & Family Profile
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Patient Name (Free text) */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Patient Name (Free text)
-                  </label>
-                  <input
-                    type="text"
-                    name="patientName"
-                    value={formData.patientName}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-
-                {/* Patient Age (Number Field with 2 Digits) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Patient Age (2 Digits)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={2}
-                    name="patientAge"
-                    value={formData.patientAge}
-                    onChange={(e) => handleAgeChange(e, "patientAge")}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-
-                {/* Location (Drop Down with inline Other text field) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Location
-                  </label>
-                  <select
-                    value={selectedLocationOption}
-                    onChange={handleLocationOptionChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  >
-                    <option value="">Select Location</option>
-                    {(formFields.find((f) => f.id === "location")?.options || LOCATIONS).map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedLocationOption === "Other" && (
-                    <input
-                      type="text"
-                      value={otherLocationText}
-                      onChange={handleOtherLocationTextChange}
-                      placeholder="Enter other city / location..."
-                      className="w-full mt-2 px-3.5 py-2.5 bg-white border border-indigo-500/50 rounded-xl text-black text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#cc2727] animate-fadeIn"
-                      autoFocus
-                    />
-                  )}
-                </div>
-
-                {/* Spouse Name (Free text) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Spouse Name (Free text)
-                  </label>
-                  <input
-                    type="text"
-                    name="spouseName"
-                    value={formData.spouseName}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-
-                {/* Spouse Age (Number Field with 2 Digits) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Spouse Age (2 Digits)
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={2}
-                    name="spouseAge"
-                    value={formData.spouseAge}
-                    onChange={(e) => handleAgeChange(e, "spouseAge")}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-              </div>
-              {renderDynamicSectionFields(2)}
-            </div>
-
-            {/* Section 3: Clinical & Surgical Details */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-              <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
-                <HeartPulse className="w-4 h-4 text-[#cc2727]" />
-                <h3 className="text-sm font-bold text-black uppercase tracking-wider">
-                  3. Clinical & Surgical Information
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Looking for Treatment (Drop Down with inline Other text field) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Looking for Treatment
-                  </label>
-                  <select
-                    value={selectedTreatmentOption}
-                    onChange={handleTreatmentOptionChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  >
-                    <option value="">Select Treatment</option>
-                    {(formFields.find((f) => f.id === "lookingForTreatment")?.options || TREATMENTS).map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedTreatmentOption === "Other" && (
-                    <input
-                      type="text"
-                      value={otherTreatmentText}
-                      onChange={handleOtherTreatmentTextChange}
-                      placeholder="Enter other treatment..."
-                      className="w-full mt-2 px-3.5 py-2.5 bg-white border border-indigo-500/50 rounded-xl text-black text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#cc2727] animate-fadeIn"
-                      autoFocus
-                    />
-                  )}
-                </div>
-
-                {/* Treatment Requirements (Free text) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Treatment Requirements (Free text)
-                  </label>
-                  <input
-                    type="text"
-                    name="treatmentRequirements"
-                    value={formData.treatmentRequirements}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-
-                {/* Pre Conditions (Free text) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Pre Conditions (Free text)
-                  </label>
-                  <input
-                    type="text"
-                    name="preConditions"
-                    value={formData.preConditions}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-
-                {/* Surgery Details (Free text) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Surgery Details (Free text)
-                  </label>
-                  <input
-                    type="text"
-                    name="surgeryDetails"
-                    value={formData.surgeryDetails}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-              </div>
-              {renderDynamicSectionFields(3)}
-            </div>
-
-            {/* Section 4: Follow Up, Disposition & Appointments */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-              <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-[#cc2727]" />
-                <h3 className="text-sm font-bold text-black uppercase tracking-wider">
-                  4. Disposition, Appointments & Follow-up
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {/* Follow Up Date (Date Field DD-MMM-YY) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5 flex items-center justify-between">
-                    <span>Follow Up Date (DD-MMM-YY)</span>
-                    {formData.followUpDate && (
-                      <span className="text-[11px] font-mono text-[#cc2727]">
-                        {formData.followUpDate}
-                      </span>
+                    {saving ? (
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Save className="w-3.5 h-3.5" />
                     )}
-                  </label>
-                  <input
-                    type="date"
-                    value={parseDDMMMYYToISO(formData.followUpDate)}
-                    onChange={(e) => handleDateChange(e, "followUpDate")}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] [color-scheme:light]"
-                  />
+                    <span>Save Changes</span>
+                  </button>
                 </div>
-
-                {/* Sub Dispositions (Drop Down) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Sub Dispositions (Drop Down)
-                  </label>
-                  <select
-                    name="subDispositions"
-                    value={formData.subDispositions}
-                    onChange={handleSubDispositionChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  >
-                    <option value="">Select Sub Disposition</option>
-                    {(formFields.find((f) => f.id === "subDispositions")?.options || Object.keys(SUB_DISPOSITIONS_MAP)).map((sub) => (
-                      <option key={sub} value={sub}>
-                        {sub}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Dispositions (Auto Selection) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Dispositions (Auto Selection)
-                  </label>
-                  <input
-                    type="text"
-                    readOnly
-                    name="dispositions"
-                    value={formData.dispositions}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[#cc2727] font-semibold text-xs cursor-not-allowed"
-                  />
-                </div>
-
-                {/* Valid Status (Auto Selection) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Valid Status (Auto Selection)
-                  </label>
-                  <input
-                    type="text"
-                    readOnly
-                    name="validStatus"
-                    value={formData.validStatus}
-                    className={`w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold cursor-not-allowed ${
-                      formData.validStatus === "Valid"
-                        ? "text-emerald-700"
-                        : formData.validStatus === "Invalid"
-                        ? "text-rose-400"
-                        : "text-gray-500"
-                    }`}
-                  />
-                </div>
-
-                {/* Appointment Date (Date Field DD-MMM-YY) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5 flex items-center justify-between">
-                    <span>Appointment Date (DD-MMM-YY)</span>
-                    {formData.appointmentDate && (
-                      <span className="text-[11px] font-mono text-[#cc2727]">
-                        {formData.appointmentDate}
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="date"
-                    value={parseDDMMMYYToISO(formData.appointmentDate)}
-                    onChange={(e) =>
-                      handleDateChange(
-                        e,
-                        "appointmentDate",
-                        "appointmentMonth"
-                      )
-                    }
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] [color-scheme:light]"
-                  />
-                </div>
-
-                {/* Appointment month (Month MMM-YY) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Appointment Month (MMM-YY)
-                  </label>
-                  <input
-                    type="text"
-                    name="appointmentMonth"
-                    value={formData.appointmentMonth}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-
-                {/* Teleconsultation Slot (Drop Down) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Teleconsultation Slot (Drop Down)
-                  </label>
-                  <select
-                    name="teleconsultationSlot"
-                    value={formData.teleconsultationSlot}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  >
-                    <option value="">Select Slot</option>
-                    {(formFields.find((f) => f.id === "teleconsultationSlot")?.options || TELECONSULTATION_SLOTS).map((slot) => (
-                      <option key={slot} value={slot}>
-                        {slot}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Consultation Charges (Free text Amount Field) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Consultation Charges (Amount Field)
-                  </label>
-                  <input
-                    type="text"
-                    name="consultationCharges"
-                    value={formData.consultationCharges}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-
-                {/* Surgery Date (Date Field DD-MMM-YY) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5 flex items-center justify-between">
-                    <span>Surgery Date (DD-MMM-YY)</span>
-                    {formData.surgeryDate && (
-                      <span className="text-[11px] font-mono text-[#cc2727]">
-                        {formData.surgeryDate}
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="date"
-                    value={parseDDMMMYYToISO(formData.surgeryDate)}
-                    onChange={(e) => handleDateChange(e, "surgeryDate")}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] [color-scheme:light]"
-                  />
-                </div>
-
-                {/* Surgery Cost (Free text Amount Field) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Surgery Cost (Amount Field)
-                  </label>
-                  <input
-                    type="text"
-                    name="surgeryCost"
-                    value={formData.surgeryCost}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-
-                {/* Surgery - Payment Received (Free text Amount Field) */}
-                <div>
-                  <label className="block text-xs font-semibold text-black mb-1.5">
-                    Surgery - Payment Received (Amount)
-                  </label>
-                  <input
-                    type="text"
-                    name="surgeryPaymentReceived"
-                    value={formData.surgeryPaymentReceived}
-                    onChange={handleChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                  />
-                </div>
-              </div>
-              {renderDynamicSectionFields(4)}
+              </form>
             </div>
 
-            {/* Section 5: Notes */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-              <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-[#cc2727]" />
-                <h3 className="text-sm font-bold text-black uppercase tracking-wider">
-                  5. Notes & Observations
-                </h3>
-              </div>
-              <div>
-                <textarea
-                  name="notes"
-                  rows={4}
-                  value={formData.notes}
-                  onChange={handleChange}
-                  placeholder="Clinical notes, patient conversation remarks, payment details..."
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] resize-none"
-                />
-              </div>
-            </div>
-
-            {/* Bottom Save Bar */}
-            <div className="flex items-center justify-between p-4 bg-white/90 border border-slate-200 rounded-2xl sticky bottom-4 z-20 backdrop-blur-md shadow-sm">
-              <span className="text-xs text-gray-500">
-                All changes made above will be updated for Unique ID:{" "}
-                <strong className="text-black">{formData.uniqueId}</strong>
-              </span>
-              <div className="flex items-center gap-3">
-                <Link
-                  href="/admin/leads"
-                  className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-black text-xs font-semibold rounded-xl transition-colors"
-                >
-                  Cancel
-                </Link>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="py-2.5 px-5 bg-[#cc2727] hover:bg-[#b02121] text-black text-xs font-semibold rounded-xl flex items-center gap-2 shadow-lg shadow-[#cc2727]/20 transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {saving ? (
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Save className="w-3.5 h-3.5" />
-                  )}
-                  <span>Save Changes</span>
-                </button>
-                </div>
-              </div>
-            </form>
-          </div>
-
-            {/* Right Column: Notes History + Change History */}
-            <div className="xl:col-span-4 space-y-6">
-              <NotesHistory
-                notesHistory={notesHistory}
-                leadUniqueId={formData.uniqueId}
-              />
-              <LeadAuditHistory
-                auditLogs={auditLogs}
-                leadCreatedAt={formData.createdAt || formData.leadTimestamp}
-                leadUniqueId={formData.uniqueId}
-              />
+            {/* Right 1 col: Notes History & Audit Logs */}
+            <div className="space-y-6">
+              <NotesHistory notesHistory={notesHistory} />
+              <LeadAuditHistory auditLogs={auditLogs} />
             </div>
           </div>
         </main>
@@ -1313,20 +1549,19 @@ export default function LeadDetailPage({
 
       {/* Delete Confirmation Modal */}
       {isConfirmDeleteOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-            <div className="flex items-center gap-3 text-rose-400 font-bold text-base">
-              <AlertCircle className="w-6 h-6 shrink-0" />
-              <span>Delete Patient Lead?</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+              <AlertCircle className="w-6 h-6" />
             </div>
-            <p className="text-xs text-black leading-relaxed">
-              Are you sure you want to permanently delete lead{" "}
-              <strong>{formData.patientName || formData.uniqueId}</strong> (
-              <span className="font-mono text-[#cc2727] font-bold">
-                {formData.uniqueId}
-              </span>
-              )? This action cannot be undone.
-            </p>
+            <div>
+              <h3 className="text-base font-bold text-black">Delete Patient Lead</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Are you sure you want to permanently delete lead{" "}
+                <span className="font-bold text-black">{formData.wifeName || formData.uniqueId}</span>?
+                This action cannot be undone.
+              </p>
+            </div>
             <div className="flex gap-3 pt-2">
               <button
                 type="button"
@@ -1339,9 +1574,14 @@ export default function LeadDetailPage({
                 type="button"
                 disabled={deleting}
                 onClick={handleDelete}
-                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-black text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-rose-600/20"
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-rose-600/20"
               >
-                {deleting ? "Deleting..." : "Yes, Delete Lead"}
+                {deleting ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>Delete Lead</span>
               </button>
             </div>
           </div>

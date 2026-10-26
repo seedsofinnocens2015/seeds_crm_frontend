@@ -38,10 +38,10 @@ interface FormBuilderClientProps {
 }
 
 const SECTION_META = [
-  { id: 1, title: "1. Lead Date, Contact & Caller", color: "border-blue-500 text-blue-600 bg-blue-50" },
-  { id: 2, title: "2. Patient & Family Profile", color: "border-emerald-500 text-emerald-600 bg-emerald-50" },
-  { id: 3, title: "3. Clinical & Surgical Information", color: "border-purple-500 text-purple-600 bg-purple-50" },
-  { id: 4, title: "4. Disposition, Appointments & Follow-up", color: "border-[#cc2727] text-[#cc2727] bg-red-50" },
+  { id: 1, title: "1. Lead Identification & Overview", color: "border-blue-500 text-blue-600 bg-blue-50" },
+  { id: 2, title: "2. Couple Profile & Medical Details", color: "border-emerald-500 text-emerald-600 bg-emerald-50" },
+  { id: 3, title: "3. Contact & Address Information", color: "border-purple-500 text-purple-600 bg-purple-50" },
+  { id: 4, title: "4. Disposition, Centre, Visits & Registration", color: "border-[#cc2727] text-[#cc2727] bg-red-50" },
 ];
 
 export default function FormBuilderClient({ role }: FormBuilderClientProps) {

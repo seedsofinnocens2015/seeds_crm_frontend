@@ -1,5 +1,6 @@
 "use client";
 
+import { ALL_LEADS_COLUMNS } from "@/lib/columnsConfig";
 import LeadSquaredFilter from "@/app/components/LeadSquaredFilter";
 import ManageColumnsModal, { ColumnItem } from "@/app/components/ManageColumnsModal";
 import { renderLeadTableCell } from "@/app/components/LeadTableCellRenderer";
@@ -126,36 +127,7 @@ function matchesDateRange(
   return true;
 }
 
-const TABLE_COLUMNS: ColumnConfig[] = [
-  { id: "patientName", label: "Patient Name" },
-  { id: "patientAge", label: "Patient Age" },
-  { id: "location", label: "Location" },
-  { id: "spouseName", label: "Spouse Name" },
-  { id: "spouseAge", label: "Spouse Age" },
-  { id: "date", label: "Date (DD-MMM-YY)" },
-  { id: "leadTimestamp", label: "Time Stamp" },
-  { id: "mobileNumber", label: "Mobile Number" },
-  { id: "alternateNumber", label: "Alternate #" },
-  { id: "callerName", label: "Caller Name" },
-  { id: "leadSource", label: "Lead Source" },
-  { id: "referredBy", label: "Referred By" },
-  { id: "lookingForTreatment", label: "Looking for Treatment" },
-  { id: "treatmentRequirements", label: "Treatment Requirements" },
-  { id: "preConditions", label: "Pre Conditions" },
-  { id: "surgeryDetails", label: "Surgery Details" },
-  { id: "followUpDate", label: "Follow Up Date" },
-  { id: "subDispositions", label: "Sub Dispositions" },
-  { id: "dispositions", label: "Dispositions" },
-  { id: "validStatus", label: "Valid Status" },
-  { id: "appointmentDate", label: "Appointment Date" },
-  { id: "appointmentMonth", label: "Appointment Month" },
-  { id: "teleconsultationSlot", label: "Teleconsultation Slot" },
-  { id: "consultationCharges", label: "Consultation Charges" },
-  { id: "surgeryDate", label: "Surgery Date" },
-  { id: "surgeryCost", label: "Surgery Cost" },
-  { id: "surgeryPaymentReceived", label: "Surgery Payment Received" },
-  { id: "notes", label: "Notes" },
-];
+const TABLE_COLUMNS: ColumnConfig[] = ALL_LEADS_COLUMNS;
 
 export default function AgentLeadsPage() {
   const router = useRouter();
@@ -163,7 +135,7 @@ export default function AgentLeadsPage() {
   const cachedInitial = typeof window !== "undefined" ? getCachedLeads("agent") : null;
   const [user, setUser] = useState<any>(null);
   const [leads, setLeads] = useState<any[]>(() => cachedInitial?.leads || []);
-  const [nextUniqueId, setNextUniqueId] = useState<string>(() => cachedInitial?.nextUniqueId || "SC-1");
+  const [nextUniqueId, setNextUniqueId] = useState<string>(() => cachedInitial?.nextUniqueId || "SOI-1");
   const [loading, setLoading] = useState(() => !cachedInitial);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -449,10 +421,10 @@ export default function AgentLeadsPage() {
     setLeads((prev) => [newLead, ...prev]);
     notifyLeadUpdated();
     // Compute next ID
-    const match = newLead.uniqueId?.match(/^SC-(\d+)$/i);
+    const match = newLead.uniqueId?.match(/^(?:SOI|SC)-(\d+)$/i);
     if (match) {
       const nextNum = parseInt(match[1], 10) + 1;
-      setNextUniqueId(`SC-${nextNum}`);
+      setNextUniqueId(`SOI-${nextNum}`);
     }
     setToastMessage(`Patient lead ${newLead.patientName || newLead.uniqueId} created successfully!`);
     setTimeout(() => setToastMessage(""), 4000);
@@ -526,7 +498,7 @@ export default function AgentLeadsPage() {
   const distinctSubDispositions = useMemo(() => {
     const set = new Set<string>(SUB_DISPOSITIONS);
     leads.forEach((l) => {
-      const s = l.subDispositions || l.subDisposition;
+      const s = l.subStatus || l.subDispositions || l.subDisposition;
       if (s) set.add(s);
     });
     return Array.from(set).sort();
@@ -672,19 +644,19 @@ export default function AgentLeadsPage() {
 
       // 8. Sub Dispositions wise
       if (filters.subDispositions) {
-        const leadSub = (lead.subDispositions || lead.subDisposition || "").toLowerCase();
+        const leadSub = (lead.subStatus || lead.subDispositions || lead.subDisposition || "").toLowerCase();
         if (leadSub !== filters.subDispositions.toLowerCase()) return false;
       }
 
       // 9. Dispositions wise
       if (filters.dispositions) {
-        const leadDisp = (lead.dispositions || lead.disposition || "").toLowerCase();
+        const leadDisp = (lead.leadStage || lead.dispositions || lead.disposition || "").toLowerCase();
         if (leadDisp !== filters.dispositions.toLowerCase()) return false;
       }
 
       // 10. Valid Status wise
       if (filters.validStatus) {
-        const leadVal = (lead.validStatus || "").toLowerCase();
+        const leadVal = (lead.leadValidStatus || lead.validStatus || "").toLowerCase();
         if (leadVal !== filters.validStatus.toLowerCase()) return false;
       }
 
@@ -934,7 +906,7 @@ export default function AgentLeadsPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by Unique ID, Patient Name, Phone, Location..."
+                  placeholder="Search by Lead Number, Prospect ID, Wife Name, Husband Name, Phone, Centre..."
                   className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-black text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#cc2727] shadow-sm"
                 />
               </div>
@@ -1186,7 +1158,6 @@ export default function AgentLeadsPage() {
                         {/* 1. Unique ID (Sticky Left) */}
                         <td className="px-4 py-3.5 sticky left-0 bg-white group-hover:bg-slate-100/90 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
                           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20 text-xs font-mono font-bold">
-                            <Hash className="w-3 h-3 text-[#cc2727]" />
                             {lead.uniqueId || "N/A"}
                           </div>
                         </td>

@@ -11,173 +11,387 @@ interface LeadTableCellProps {
 
 export function renderLeadTableCell({ colId, lead }: LeadTableCellProps) {
   switch (colId) {
-    case "patientName":
+    case "firstActivityDate":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-xs text-slate-700 font-mono">
+          {lead.firstActivityDate || lead.createdOn || "-"}
+        </td>
+      );
+
+    case "husbandName":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-semibold text-black">
+          {lead.husbandName || lead.spouseName || "-"}
+        </td>
+      );
+
+    case "wifeName":
       return (
         <td key={colId} className="px-4 py-3.5 font-semibold text-black group-hover:text-[#cc2727] transition-colors">
-          {lead.patientName || "-"}
+          {lead.wifeName || lead.patientName || "-"}
         </td>
       );
 
-    case "patientAge":
+    case "husbandAge":
       return (
         <td key={colId} className="px-4 py-3.5 font-mono text-black">
-          {lead.patientAge || "-"}
+          {lead.husbandAge || lead.spouseAge || "-"}
         </td>
       );
 
-    case "location":
+    case "wifeAge":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-black">
+          {lead.wifeAge || lead.patientAge || "-"}
+        </td>
+      );
+
+    case "whenPlanningToStartTreatment":
       return (
         <td key={colId} className="px-4 py-3.5 text-black">
-          {lead.location || lead.otherCity || "-"}
+          {lead.whenPlanningToStartTreatment || lead.lookingForTreatment || "-"}
         </td>
       );
 
-    case "spouseName":
+    case "preMedicalConditions":
       return (
-        <td key={colId} className="px-4 py-3.5 text-black">
-          {lead.spouseName || "-"}
+        <td key={colId} className="px-4 py-3.5 text-black font-medium">
+          <span
+            className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
+              lead.preMedicalConditions === "Yes"
+                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            {lead.preMedicalConditions || "No"}
+          </span>
         </td>
       );
 
-    case "spouseAge":
+    case "marriedSince":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-black">
+          {lead.marriedSince ? `${lead.marriedSince} Yrs` : "-"}
+        </td>
+      );
+
+    case "tryingToConceiveYears":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-black">
+          {lead.tryingToConceiveYears ? `${lead.tryingToConceiveYears} Yrs` : "-"}
+        </td>
+      );
+
+    case "primaryEmail":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-slate-700 font-mono text-xs">
+          {lead.primaryEmail || "-"}
+        </td>
+      );
+
+    case "secondaryEmail":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-slate-700 font-mono text-xs">
+          {lead.secondaryEmail || "-"}
+        </td>
+      );
+
+    case "primaryMobileNumber":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-black font-semibold">
+          {lead.primaryMobileNumber || lead.mobileNumber || "-"}
+        </td>
+      );
+
+    case "secondaryMobileNumber":
       return (
         <td key={colId} className="px-4 py-3.5 font-mono text-gray-500">
-          {lead.spouseAge || "-"}
+          {lead.secondaryMobileNumber || lead.alternateNumber || "-"}
         </td>
       );
 
-    case "date":
+    case "whatsappMobileNumber":
       return (
-        <td key={colId} className="px-4 py-3.5 font-mono text-black">
-          {lead.date || lead.dateOfLead || "-"}
+        <td key={colId} className="px-4 py-3.5 font-mono text-emerald-700">
+          {lead.whatsappMobileNumber || "-"}
         </td>
       );
 
-    case "leadTimestamp":
-      return (
-        <td key={colId} className="px-4 py-3.5 font-mono text-[#cc2727] text-[11px]">
-          {lead.leadTimestamp ||
-            (lead.createdAt
-              ? new Date(lead.createdAt).toLocaleString("en-IN", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true,
-                })
-              : lead.date || "-")}
-        </td>
-      );
-
-    case "mobileNumber":
-      return (
-        <td key={colId} className="px-4 py-3.5 font-mono text-black">
-          {lead.mobileNumber || lead.phoneNumber || "-"}
-        </td>
-      );
-
-    case "alternateNumber":
+    case "otherNumbers":
       return (
         <td key={colId} className="px-4 py-3.5 font-mono text-gray-500">
-          {lead.alternateNumber || "-"}
+          {lead.otherNumbers || "-"}
         </td>
       );
 
-    case "callerName":
+    case "whatsappConsent":
       return (
         <td key={colId} className="px-4 py-3.5 text-black">
-          {lead.callerName || "-"}
+          {lead.whatsappConsent || "No"}
+        </td>
+      );
+
+    case "callingConsent":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-black">
+          {lead.callingConsent || "No"}
         </td>
       );
 
     case "leadSource":
       return (
-        <td key={colId} className="px-4 py-3.5 text-gray-500">
-          {lead.leadSource || "-"}
-        </td>
-      );
-
-    case "referredBy":
-      return (
-        <td key={colId} className="px-4 py-3.5 text-gray-500">
-          {lead.referredBy || "-"}
-        </td>
-      );
-
-    case "lookingForTreatment":
-      return (
         <td key={colId} className="px-4 py-3.5 text-black font-medium">
-          {lead.lookingForTreatment || lead.treatmentRequired || lead.treatment || "-"}
+          {lead.leadSource || lead.utmSource || "-"}
         </td>
       );
 
-    case "treatmentRequirements":
+    case "campaignName":
       return (
-        <td key={colId} className="px-4 py-3.5 text-gray-500 truncate max-w-[160px]" title={lead.treatmentRequirements || lead.treatmentRequired}>
-          {lead.treatmentRequirements || lead.treatmentRequired || "-"}
+        <td key={colId} className="px-4 py-3.5 text-slate-700">
+          {lead.campaignName || "-"}
         </td>
       );
 
-    case "preConditions":
+    case "sourceName":
       return (
-        <td key={colId} className="px-4 py-3.5 text-gray-500 truncate max-w-[160px]" title={lead.preConditions || lead.preCondition}>
-          {lead.preConditions || lead.preCondition || "-"}
+        <td key={colId} className="px-4 py-3.5 text-slate-700 font-mono text-xs">
+          {lead.sourceName || "-"}
         </td>
       );
 
-    case "surgeryDetails":
+    case "source":
       return (
-        <td key={colId} className="px-4 py-3.5 text-gray-500 truncate max-w-[160px]" title={lead.surgeryDetails || lead.surgicalData}>
-          {lead.surgeryDetails || lead.surgicalData || "-"}
+        <td key={colId} className="px-4 py-3.5 text-slate-700">
+          {lead.source || "General"}
         </td>
       );
 
-    case "followUpDate":
+    case "leadScore":
       return (
-        <td key={colId} className="px-4 py-3.5 font-mono text-black">
-          {lead.followUpDate || lead.followUpDates || "-"}
+        <td key={colId} className="px-4 py-3.5 font-mono text-xs font-bold text-amber-700">
+          {lead.leadScore ?? "0"}
         </td>
       );
 
-    case "subDispositions":
+    case "subStatus":
       return (
-        <td key={colId} className="px-4 py-3.5 text-black">
-          {lead.subDispositions || lead.subDisposition || "-"}
+        <td key={colId} className="px-4 py-3.5 font-medium text-black">
+          <span className="inline-flex px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200 text-xs font-semibold">
+            {lead.subStatus || lead.subDispositions || "-"}
+          </span>
         </td>
       );
 
-    case "dispositions":
+    case "leadStage":
       return (
-        <td key={colId} className="px-4 py-3.5">
-          {lead.dispositions || lead.disposition ? (
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-              {lead.dispositions || lead.disposition}
-            </span>
-          ) : (
-            "-"
-          )}
-        </td>
-      );
-
-    case "validStatus":
-      return (
-        <td key={colId} className="px-4 py-3.5">
-          {lead.validStatus ? (
+        <td key={colId} className="px-4 py-3.5 font-medium text-black">
+          {lead.leadStage || lead.dispositions ? (
             <span
-              className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-                lead.validStatus === "Valid"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/20"
-                  : lead.validStatus === "Invalid"
-                  ? "bg-rose-500/10 text-rose-300 border-rose-500/20"
-                  : "bg-slate-700/30 text-gray-500 border-slate-300/50"
+              className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
+                (lead.leadStage || lead.dispositions) === "Converted"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : (lead.leadStage || lead.dispositions) === "Contacted"
+                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : (lead.leadStage || lead.dispositions) === "Contact Attempt"
+                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                  : "bg-slate-100 text-slate-700 border border-slate-200"
               }`}
             >
-              {lead.validStatus}
+              {lead.leadStage || lead.dispositions}
             </span>
           ) : (
             "-"
           )}
+        </td>
+      );
+
+    case "leadValidStatus":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-medium text-black">
+          {lead.leadValidStatus || lead.validStatus ? (
+            <span
+              className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
+                (lead.leadValidStatus || lead.validStatus) === "Valid"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : (lead.leadValidStatus || lead.validStatus) === "Invalid"
+                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                  : "bg-slate-100 text-slate-600"
+              }`}
+            >
+              {lead.leadValidStatus || lead.validStatus}
+            </span>
+          ) : (
+            "-"
+          )}
+        </td>
+      );
+
+    case "createdBy":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-xs text-slate-700">
+          {lead.createdByMember || (typeof lead.createdBy === "object" ? lead.createdBy?.name : lead.createdBy) || "-"}
+        </td>
+      );
+
+    case "createdOn":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-xs font-mono text-slate-600">
+          {lead.createdOn || lead.leadTimestamp || lead.date || "-"}
+        </td>
+      );
+
+    case "modifiedBy":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-xs text-slate-700">
+          {lead.modifiedByMember || "-"}
+        </td>
+      );
+
+    case "modifiedOn":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-xs font-mono text-slate-600">
+          {lead.modifiedOn || "-"}
+        </td>
+      );
+
+    case "centreAddress":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-xs text-slate-700 max-w-xs truncate" title={lead.centreAddress}>
+          {lead.centreAddress || "-"}
+        </td>
+      );
+
+    case "ptAddress":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-xs text-slate-700 max-w-xs truncate" title={lead.ptAddress}>
+          {lead.ptAddress || "-"}
+        </td>
+      );
+
+    case "ptPincode":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-black">
+          {lead.ptPincode || "-"}
+        </td>
+      );
+
+    case "ptCountry":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-black">
+          {lead.ptCountry || "India"}
+        </td>
+      );
+
+    case "ptState":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-black">
+          {lead.ptState || "-"}
+        </td>
+      );
+
+    case "ptCity":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-black">
+          {lead.ptCity || "-"}
+        </td>
+      );
+
+    case "leadOwner":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-semibold text-black">
+          {lead.leadOwner || lead.callerName || "-"}
+        </td>
+      );
+
+    case "leadAge":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-xs font-semibold text-indigo-700">
+          {lead.leadAge || "0 days"}
+        </td>
+      );
+
+    case "campLocation":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-black">
+          {lead.campLocation || "-"}
+        </td>
+      );
+
+    case "centreLocation":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-semibold text-black">
+          {lead.centreLocation || lead.location || lead.otherCity || "-"}
+        </td>
+      );
+
+    case "followUpDateTime":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-black text-xs">
+          {lead.followUpDateTime || lead.followUpDate || "-"}
+        </td>
+      );
+
+    case "centreVisitedDate":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-black">
+          {lead.centreVisitedDate || "-"}
+        </td>
+      );
+
+    case "campVisitedDate":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-black">
+          {lead.campVisitedDate || "-"}
+        </td>
+      );
+
+    case "registrationStatus":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-black">
+          <span
+            className={`inline-flex px-2 py-0.5 rounded-md text-xs font-semibold ${
+              lead.registrationStatus === "Yes"
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            {lead.registrationStatus || "No"}
+          </span>
+        </td>
+      );
+
+    case "registrationNumber":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-black">
+          {lead.registrationNumber || "-"}
+        </td>
+      );
+
+    case "registrationAmount":
+      return (
+        <td key={colId} className="px-4 py-3.5 font-mono text-black">
+          {lead.registrationAmount ? `₹${lead.registrationAmount}` : "-"}
+        </td>
+      );
+
+    case "package":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-black">
+          {lead.package || "-"}
+        </td>
+      );
+
+    case "plan":
+      return (
+        <td key={colId} className="px-4 py-3.5 text-black">
+          {lead.plan || "-"}
+        </td>
+      );
+
+    case "notes":
+      return (
+        <td key={colId} className="px-4 py-3.5 max-w-xs truncate text-gray-600" title={lead.notes}>
+          {lead.notes || "-"}
         </td>
       );
 
@@ -188,63 +402,11 @@ export function renderLeadTableCell({ colId, lead }: LeadTableCellProps) {
         </td>
       );
 
-    case "appointmentMonth":
-      return (
-        <td key={colId} className="px-4 py-3.5 font-mono text-gray-500">
-          {lead.appointmentMonth || "-"}
-        </td>
-      );
-
-    case "teleconsultationSlot":
-      return (
-        <td key={colId} className="px-4 py-3.5 font-mono text-black">
-          {lead.teleconsultationSlot || lead.appointmentSlot || "-"}
-        </td>
-      );
-
-    case "consultationCharges":
-      return (
-        <td key={colId} className="px-4 py-3.5 font-mono text-emerald-700">
-          {lead.consultationCharges || lead.teleConsultationCharges
-            ? `₹${lead.consultationCharges || lead.teleConsultationCharges}`
-            : "-"}
-        </td>
-      );
-
-    case "surgeryDate":
-      return (
-        <td key={colId} className="px-4 py-3.5 font-mono text-black">
-          {lead.surgeryDate || "-"}
-        </td>
-      );
-
-    case "surgeryCost":
-      return (
-        <td key={colId} className="px-4 py-3.5 font-mono text-[#cc2727] font-semibold">
-          {lead.surgeryCost ? `₹${lead.surgeryCost}` : "-"}
-        </td>
-      );
-
-    case "surgeryPaymentReceived":
-      return (
-        <td key={colId} className="px-4 py-3.5 font-mono text-emerald-700">
-          {lead.surgeryPaymentReceived || lead.surgeryReceipt
-            ? `₹${lead.surgeryPaymentReceived || lead.surgeryReceipt}`
-            : "-"}
-        </td>
-      );
-
-    case "notes":
-      return (
-        <td key={colId} className="px-4 py-3.5 text-gray-500 truncate max-w-[200px]" title={lead.notes}>
-          {lead.notes || "-"}
-        </td>
-      );
-
     default:
+      const customVal = lead.customFields?.[colId] ?? lead[colId] ?? "-";
       return (
         <td key={colId} className="px-4 py-3.5 text-black">
-          {lead[colId] || "-"}
+          {typeof customVal === "object" ? JSON.stringify(customVal) : String(customVal)}
         </td>
       );
   }

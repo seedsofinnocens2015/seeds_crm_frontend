@@ -1,5 +1,6 @@
 "use client";
 
+import { ALL_LEADS_COLUMNS } from "@/lib/columnsConfig";
 import LeadSquaredFilter from "@/app/components/LeadSquaredFilter";
 import ManageColumnsModal, { ColumnItem } from "@/app/components/ManageColumnsModal";
 import { renderLeadTableCell } from "@/app/components/LeadTableCellRenderer";
@@ -123,36 +124,7 @@ function matchesDateRange(
   return true;
 }
 
-const TABLE_COLUMNS: ColumnConfig[] = [
-  { id: "patientName", label: "Patient Name" },
-  { id: "patientAge", label: "Patient Age" },
-  { id: "location", label: "Location" },
-  { id: "spouseName", label: "Spouse Name" },
-  { id: "spouseAge", label: "Spouse Age" },
-  { id: "date", label: "Date (DD-MMM-YY)" },
-  { id: "leadTimestamp", label: "Time Stamp" },
-  { id: "mobileNumber", label: "Mobile Number" },
-  { id: "alternateNumber", label: "Alternate #" },
-  { id: "callerName", label: "Caller Name" },
-  { id: "leadSource", label: "Lead Source" },
-  { id: "referredBy", label: "Referred By" },
-  { id: "lookingForTreatment", label: "Looking for Treatment" },
-  { id: "treatmentRequirements", label: "Treatment Requirements" },
-  { id: "preConditions", label: "Pre Conditions" },
-  { id: "surgeryDetails", label: "Surgery Details" },
-  { id: "followUpDate", label: "Follow Up Date" },
-  { id: "subDispositions", label: "Sub Dispositions" },
-  { id: "dispositions", label: "Dispositions" },
-  { id: "validStatus", label: "Valid Status" },
-  { id: "appointmentDate", label: "Appointment Date" },
-  { id: "appointmentMonth", label: "Appointment Month" },
-  { id: "teleconsultationSlot", label: "Teleconsultation Slot" },
-  { id: "consultationCharges", label: "Consultation Charges" },
-  { id: "surgeryDate", label: "Surgery Date" },
-  { id: "surgeryCost", label: "Surgery Cost" },
-  { id: "surgeryPaymentReceived", label: "Surgery Payment Received" },
-  { id: "notes", label: "Notes" },
-];
+const TABLE_COLUMNS: ColumnConfig[] = ALL_LEADS_COLUMNS;
 
 export default function MISLeadsPage() {
   const router = useRouter();
@@ -400,66 +372,12 @@ export default function MISLeadsPage() {
   const prepareExportData = () => {
     return filteredLeads.map((lead) => {
       const row: Record<string, any> = {};
-
-      // 1. Unique ID is always included
-      row["Unique ID"] = lead.uniqueId || "N/A";
-
-      // 2. Add only currently visible columns
-      if (visibleColumns.patientName) row["Patient Name"] = lead.patientName || "-";
-      if (visibleColumns.patientAge) row["Patient Age"] = lead.patientAge || "-";
-      if (visibleColumns.location) row["Location"] = lead.location || lead.otherCity || "-";
-      if (visibleColumns.spouseName) row["Spouse Name"] = lead.spouseName || "-";
-      if (visibleColumns.spouseAge) row["Spouse Age"] = lead.spouseAge || "-";
-      if (visibleColumns.date) row["Date (DD-MMM-YY)"] = lead.date || lead.dateOfLead || "-";
-      if (visibleColumns.leadTimestamp) {
-        row["Time Stamp"] =
-          lead.leadTimestamp ||
-          (lead.createdAt
-            ? new Date(lead.createdAt).toLocaleString("en-IN", {
-                day: "2-digit",
-                month: "short",
-                year: "2-digit",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: true,
-              })
-            : lead.date || "-");
-      }
-      if (visibleColumns.mobileNumber) row["Mobile Number"] = lead.mobileNumber || lead.phoneNumber || "-";
-      if (visibleColumns.alternateNumber) row["Alternate #"] = lead.alternateNumber || "-";
-      if (visibleColumns.callerName) row["Caller Name"] = lead.callerName || "-";
-      if (visibleColumns.leadSource) row["Lead Source"] = lead.leadSource || "-";
-      if (visibleColumns.referredBy) row["Referred By"] = lead.referredBy || "-";
-      if (visibleColumns.lookingForTreatment) {
-        row["Looking for Treatment"] = lead.lookingForTreatment || lead.treatmentRequired || lead.treatment || "-";
-      }
-      if (visibleColumns.treatmentRequirements) {
-        row["Treatment Requirements"] = lead.treatmentRequirements || lead.treatmentRequired || "-";
-      }
-      if (visibleColumns.preConditions) row["Pre Conditions"] = lead.preConditions || lead.preCondition || "-";
-      if (visibleColumns.surgeryDetails) row["Surgery Details"] = lead.surgeryDetails || lead.surgicalData || "-";
-      if (visibleColumns.followUpDate) row["Follow Up Date"] = lead.followUpDate || lead.followUpDates || "-";
-      if (visibleColumns.subDispositions) row["Sub Dispositions"] = lead.subDispositions || lead.subDisposition || "-";
-      if (visibleColumns.dispositions) row["Dispositions"] = lead.dispositions || lead.disposition || "-";
-      if (visibleColumns.validStatus) row["Valid Status"] = lead.validStatus || "-";
-      if (visibleColumns.appointmentDate) row["Appointment Date"] = lead.appointmentDate || "-";
-      if (visibleColumns.appointmentMonth) row["Appointment Month"] = lead.appointmentMonth || "-";
-      if (visibleColumns.teleconsultationSlot) {
-        row["Teleconsultation Slot"] = lead.teleconsultationSlot || lead.appointmentSlot || "-";
-      }
-      if (visibleColumns.consultationCharges) {
-        row["Consultation Charges"] =
-          lead.consultationCharges || lead.teleConsultationCharges
-            ? lead.consultationCharges || lead.teleConsultationCharges
-            : "-";
-      }
-      if (visibleColumns.surgeryDate) row["Surgery Date"] = lead.surgeryDate || "-";
-      if (visibleColumns.surgeryCost) row["Surgery Cost"] = lead.surgeryCost || "-";
-      if (visibleColumns.surgeryPaymentReceived) {
-        row["Surgery Payment Received"] = lead.surgeryPaymentReceived || lead.surgeryReceipt || "-";
-      }
-      if (visibleColumns.notes) row["Notes"] = lead.notes || "-";
-
+      TABLE_COLUMNS.forEach((col) => {
+        if (visibleColumns[col.id]) {
+          const val = lead[col.id] ?? lead.customFields?.[col.id] ?? "-";
+          row[col.label] = typeof val === "object" ? JSON.stringify(val) : String(val);
+        }
+      });
       return row;
     });
   };
@@ -626,7 +544,7 @@ export default function MISLeadsPage() {
   const distinctSubDispositions = useMemo(() => {
     const set = new Set<string>(SUB_DISPOSITIONS);
     leads.forEach((l) => {
-      const s = l.subDispositions || l.subDisposition;
+      const s = l.subStatus || l.subDispositions || l.subDisposition;
       if (s) set.add(s);
     });
     return Array.from(set).sort();
@@ -750,19 +668,19 @@ export default function MISLeadsPage() {
 
       // 8. Sub Dispositions wise
       if (filters.subDispositions) {
-        const leadSub = (lead.subDispositions || lead.subDisposition || "").toLowerCase();
+        const leadSub = (lead.subStatus || lead.subDispositions || lead.subDisposition || "").toLowerCase();
         if (leadSub !== filters.subDispositions.toLowerCase()) return false;
       }
 
       // 9. Dispositions wise
       if (filters.dispositions) {
-        const leadDisp = (lead.dispositions || lead.disposition || "").toLowerCase();
+        const leadDisp = (lead.leadStage || lead.dispositions || lead.disposition || "").toLowerCase();
         if (leadDisp !== filters.dispositions.toLowerCase()) return false;
       }
 
       // 10. Valid Status wise
       if (filters.validStatus) {
-        const leadVal = (lead.validStatus || "").toLowerCase();
+        const leadVal = (lead.leadValidStatus || lead.validStatus || "").toLowerCase();
         if (leadVal !== filters.validStatus.toLowerCase()) return false;
       }
 
@@ -907,7 +825,7 @@ export default function MISLeadsPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by Unique ID, Patient Name, Phone, Location..."
+                  placeholder="Search by Lead Number, Prospect ID, Wife Name, Husband Name, Phone, Centre..."
                   className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-black text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#cc2727] shadow-sm"
                 />
               </div>
@@ -1161,7 +1079,6 @@ export default function MISLeadsPage() {
                         {/* 1. Unique ID (Sticky Left) */}
                         <td className="px-4 py-3.5 sticky left-0 bg-white group-hover:bg-slate-100/90 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.5)]">
                           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20 text-xs font-mono font-bold">
-                            <Hash className="w-3 h-3 text-[#cc2727]" />
                             {lead.uniqueId || "N/A"}
                           </div>
                         </td>

@@ -277,6 +277,8 @@ export default function UploadLeadsModal({
         );
 
         const pName = getVal(
+          "Wife Name",
+          "wifeName",
           "Patient Name",
           "full_name",
           "Name",
@@ -284,8 +286,15 @@ export default function UploadLeadsModal({
           "patient",
           "patientName"
         );
+        const hName = getVal(
+          "Husband Name",
+          "husbandName",
+          "Spouse Name",
+          "spouseName",
+          "Spouse"
+        );
         const pAge = getVal("Patient Age", "Age", "age", "patientAge");
-        const sName = getVal("Spouse Name", "spouseName", "Spouse");
+        const sName = hName;
         const sAge = getVal("Spouse Age", "spouseAge");
         const loc = getVal("Location", "city", "City", "location", "Branch");
         const caller = getVal("Caller Name", "callerName", "Caller", "Agent");
@@ -368,10 +377,20 @@ export default function UploadLeadsModal({
           leadTimestamp: parsedTimestamp,
           mobileNumber: finalPhone,
           alternateNumber: altPhone,
+          wifeName: pName,
           patientName: pName,
-          patientAge: pAge,
+          husbandName: sName,
           spouseName: sName,
+          wifeAge: pAge,
+          patientAge: pAge,
+          husbandAge: sAge,
           spouseAge: sAge,
+          primaryMobileNumber: finalPhone,
+          secondaryMobileNumber: altPhone,
+          subStatus: subDisp,
+          leadStage: disp,
+          leadValidStatus: validSt,
+          centreLocation: loc,
           location: loc,
           callerName: caller,
           leadSource: leadSrc || "Excel Import",
@@ -564,7 +583,7 @@ export default function UploadLeadsModal({
                   Drag & Drop Excel or CSV file here
                 </h4>
                 <p className="text-xs text-gray-600 max-w-sm mx-auto mb-4 font-normal">
-                  Supports <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong>. All rows will be assigned consecutive <strong>SC- Unique IDs</strong> automatically.
+                  Supports <strong>.xlsx</strong>, <strong>.xls</strong>, and <strong>.csv</strong>. All rows will be assigned consecutive <strong>SOI- Unique IDs</strong> automatically.
                 </p>
                 <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#cc2727] hover:bg-[#b02121] text-white text-xs font-bold shadow-md shadow-[#cc2727]/25 transition-all">
                   <Upload className="w-3.5 h-3.5" />
@@ -633,7 +652,7 @@ export default function UploadLeadsModal({
                     </span>
                   </div>
                   <span className="text-[11px] text-[#cc2727] font-semibold">
-                    Consecutive SC- Unique IDs will be auto-generated
+                    Consecutive SOI- Unique IDs will be auto-generated
                   </span>
                 </div>
                 <div className="border border-slate-300 rounded-xl overflow-x-auto max-h-[55vh] overflow-y-auto bg-white shadow-inner">
