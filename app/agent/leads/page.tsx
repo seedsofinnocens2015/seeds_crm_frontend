@@ -57,43 +57,9 @@ interface ColumnConfig {
   label: string;
 }
 
-export interface LeadFilters {
-  leadEntryDateFrom: string;
-  leadEntryDateTo: string;
-  location: string;
-  callerName: string;
-  leadSource: string;
-  treatment: string;
-  followUpDateFrom: string;
-  followUpDateTo: string;
-  subDispositions: string;
-  dispositions: string;
-  validStatus: string;
-  appointmentDateFrom: string;
-  appointmentDateTo: string;
-  surgeryDateFrom: string;
-  surgeryDateTo: string;
-  quickMetricFilter?: string;
-}
+import { LeadFilters, INITIAL_LEAD_FILTERS } from "@/types/leadFilters";
 
-const initialFilters: LeadFilters = {
-  leadEntryDateFrom: "",
-  leadEntryDateTo: "",
-  location: "",
-  callerName: "",
-  leadSource: "",
-  treatment: "",
-  followUpDateFrom: "",
-  followUpDateTo: "",
-  subDispositions: "",
-  dispositions: "",
-  validStatus: "",
-  appointmentDateFrom: "",
-  appointmentDateTo: "",
-  surgeryDateFrom: "",
-  surgeryDateTo: "",
-  quickMetricFilter: "",
-};
+const initialFilters: LeadFilters = { ...INITIAL_LEAD_FILTERS };
 
 function normalizeDateStr(dateStr: string | undefined | null): string {
   if (!dateStr) return "";
@@ -478,6 +444,38 @@ export default function AgentLeadsPage() {
     return Array.from(set).sort();
   }, [leads]);
 
+  const distinctCampaignNames = useMemo(() => {
+    const set = new Set<string>();
+    leads.forEach((l) => {
+      if (l.campaignName) set.add(l.campaignName);
+    });
+    return Array.from(set).sort();
+  }, [leads]);
+
+  const distinctSourceNames = useMemo(() => {
+    const set = new Set<string>();
+    leads.forEach((l) => {
+      if (l.sourceName) set.add(l.sourceName);
+    });
+    return Array.from(set).sort();
+  }, [leads]);
+
+  const distinctSources = useMemo(() => {
+    const set = new Set<string>();
+    leads.forEach((l) => {
+      if (l.source) set.add(l.source);
+    });
+    return Array.from(set).sort();
+  }, [leads]);
+
+  const distinctCampLocations = useMemo(() => {
+    const set = new Set<string>();
+    leads.forEach((l) => {
+      if (l.campLocation) set.add(l.campLocation);
+    });
+    return Array.from(set).sort();
+  }, [leads]);
+
   const distinctLeadSources = useMemo(() => {
     const set = new Set<string>(LEAD_SOURCES);
     leads.forEach((l) => {
@@ -507,16 +505,27 @@ export default function AgentLeadsPage() {
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filters.leadEntryDateFrom || filters.leadEntryDateTo) count++;
-    if (filters.location) count++;
-    if (filters.callerName) count++;
+    if (filters.centreLocation || filters.location) count++;
+    if (filters.campLocation) count++;
+    if (filters.leadOwner || filters.callerName) count++;
     if (filters.leadSource) count++;
-    if (filters.treatment) count++;
+    if (filters.campaignName) count++;
+    if (filters.sourceName) count++;
+    if (filters.source) count++;
+    if (filters.subStatus || filters.subDispositions) count++;
+    if (filters.leadStage || filters.dispositions) count++;
+    if (filters.leadValidStatus || filters.validStatus) count++;
     if (filters.followUpDateFrom || filters.followUpDateTo) count++;
-    if (filters.subDispositions) count++;
-    if (filters.dispositions) count++;
-    if (filters.validStatus) count++;
     if (filters.appointmentDateFrom || filters.appointmentDateTo) count++;
-    if (filters.surgeryDateFrom || filters.surgeryDateTo) count++;
+    if (filters.centreVisitedDateFrom || filters.centreVisitedDateTo) count++;
+    if (filters.campVisitedDateFrom || filters.campVisitedDateTo) count++;
+    if (filters.registrationStatus) count++;
+    if (filters.leadScoreMin || filters.leadScoreMax) count++;
+    if (filters.ptCity) count++;
+    if (filters.ptState) count++;
+    if (filters.whenPlanningToStartTreatment) count++;
+    if (filters.preMedicalConditions) count++;
+    if (filters.quickMetricFilter) count++;
     return count;
   }, [filters]);
 
@@ -559,47 +568,71 @@ export default function AgentLeadsPage() {
     });
   };
 
-  const filteredLeads = useMemo(() => {
+    const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
-      // 1. Text Search Query (Supports multiple space-separated numbers/tokens e.g. "9335920357 9810732822 9891707535")
+      // 0. Quick Metric Filter (from Dashboard KPI cards)
+      if (filters.quickMetricFilter) {
+        if (filters.quickMetricFilter === "follow_up") {
+          const hasFollowUp = !!(lead.followUpDate && lead.followUpDate.trim()) || !!(lead.followUpDates && lead.followUpDates.trim());
+          if (!hasFollowUp) return false;
+        } else if (filters.quickMetricFilter === "unassigned") {
+          const disp = (lead.dispositions || lead.disposition || "").trim().toLowerCase();
+          const isAssignedCategory =
+            disp === "converted" ||
+            disp === "contacted" ||
+            disp === "contact attempt" ||
+            disp.includes("attempt") ||
+            disp === "closed";
+          if (isAssignedCategory) return false;
+        }
+      }
+
+      // 1. Text Search Query (Supports couple names, phone numbers, campaign, source, IDs)
       if (searchQuery.trim()) {
         const tokens = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
         const id = (lead.uniqueId || "").toLowerCase();
-        const name = (lead.patientName || "").toLowerCase();
-        const phone = (lead.mobileNumber || lead.phoneNumber || "").toLowerCase();
-        const altPhone = (lead.alternateNumber || "").toLowerCase();
-        const loc = (lead.location || lead.otherCity || "").toLowerCase();
-        const treat = (lead.lookingForTreatment || lead.treatmentRequired || lead.treatment || "").toLowerCase();
-        const subDisp = (lead.subDispositions || "").toLowerCase();
-        const disp = (lead.dispositions || "").toLowerCase();
-        const caller = (lead.callerName || "").toLowerCase();
-        const source = (lead.leadSource || "").toLowerCase();
+        const wife = (lead.wifeName || lead.patientName || "").toLowerCase();
+        const husband = (lead.husbandName || "").toLowerCase();
+        const primPhone = (lead.primaryMobileNumber || lead.mobileNumber || lead.phoneNumber || "").toLowerCase();
+        const secPhone = (lead.secondaryMobileNumber || lead.alternateNumber || "").toLowerCase();
+        const waPhone = (lead.whatsappMobileNumber || "").toLowerCase();
+        const centre = (lead.centreLocation || lead.location || lead.otherCity || "").toLowerCase();
+        const camp = (lead.campLocation || "").toLowerCase();
+        const sub = (lead.subStatus || lead.subDispositions || "").toLowerCase();
+        const stage = (lead.leadStage || lead.dispositions || "").toLowerCase();
+        const owner = (lead.leadOwner || lead.callerName || "").toLowerCase();
+        const campName = (lead.campaignName || "").toLowerCase();
+        const srcName = (lead.sourceName || "").toLowerCase();
+        const src = (lead.source || lead.leadSource || "").toLowerCase();
         const notes = (lead.notes || "").toLowerCase();
 
-        // Lead matches if ANY of the space-separated tokens matches any field
         const matchesQuery = tokens.some((token) => {
           const cleanToken = token.replace(/\D/g, "");
-          const cleanPhone = phone.replace(/\D/g, "");
-          const cleanAlt = altPhone.replace(/\D/g, "");
+          const cleanPrim = primPhone.replace(/\D/g, "");
+          const cleanSec = secPhone.replace(/\D/g, "");
+          const cleanWa = waPhone.replace(/\D/g, "");
 
-          // If token looks like a phone number (>= 5 digits)
           if (cleanToken.length >= 5) {
-            if (cleanPhone.includes(cleanToken) || cleanAlt.includes(cleanToken)) {
+            if (cleanPrim.includes(cleanToken) || cleanSec.includes(cleanToken) || cleanWa.includes(cleanToken)) {
               return true;
             }
           }
 
           return (
             id.includes(token) ||
-            name.includes(token) ||
-            phone.includes(token) ||
-            altPhone.includes(token) ||
-            loc.includes(token) ||
-            treat.includes(token) ||
-            subDisp.includes(token) ||
-            disp.includes(token) ||
-            caller.includes(token) ||
-            source.includes(token) ||
+            wife.includes(token) ||
+            husband.includes(token) ||
+            primPhone.includes(token) ||
+            secPhone.includes(token) ||
+            waPhone.includes(token) ||
+            centre.includes(token) ||
+            camp.includes(token) ||
+            sub.includes(token) ||
+            stage.includes(token) ||
+            owner.includes(token) ||
+            campName.includes(token) ||
+            srcName.includes(token) ||
+            src.includes(token) ||
             notes.includes(token)
           );
         });
@@ -607,67 +640,138 @@ export default function AgentLeadsPage() {
         if (!matchesQuery) return false;
       }
 
-      // 2. Lead Entry Date wise
-      const entryDate = lead.date || lead.dateOfLead || lead.createdAt || lead.leadTimestamp;
+      // 2. Lead Entry Date / Created On
+      const entryDate = lead.date || lead.dateOfLead || lead.createdAt || lead.createdOn || lead.leadTimestamp;
       if (!matchesDateRange(entryDate, filters.leadEntryDateFrom, filters.leadEntryDateTo)) {
         return false;
       }
 
-      // 3. Location wise
-      if (filters.location) {
-        const leadLoc = (lead.location || lead.otherCity || "").toLowerCase();
-        if (leadLoc !== filters.location.toLowerCase()) return false;
+      // 3. Centre Location
+      const filterCentre = filters.centreLocation || filters.location;
+      if (filterCentre) {
+        const leadCentre = (lead.centreLocation || lead.location || lead.otherCity || "").toLowerCase();
+        if (leadCentre !== filterCentre.toLowerCase()) return false;
       }
 
-      // 4. Caller Name wise
-      if (filters.callerName) {
-        const leadCaller = (lead.callerName || "").toLowerCase();
-        if (leadCaller !== filters.callerName.toLowerCase()) return false;
+      // 4. Camp Location
+      if (filters.campLocation) {
+        const leadCamp = (lead.campLocation || "").toLowerCase();
+        if (leadCamp !== filters.campLocation.toLowerCase()) return false;
       }
 
-      // 5. Lead Source wise
+      // 5. Lead Owner / Caller
+      const filterOwner = filters.leadOwner || filters.callerName;
+      if (filterOwner) {
+        const leadOwner = (lead.leadOwner || lead.callerName || "").toLowerCase();
+        if (leadOwner !== filterOwner.toLowerCase()) return false;
+      }
+
+      // 6. Campaign Name
+      if (filters.campaignName) {
+        const leadCamp = (lead.campaignName || "").toLowerCase();
+        if (leadCamp !== filters.campaignName.toLowerCase()) return false;
+      }
+
+      // 7. Source Name (DID/Number)
+      if (filters.sourceName) {
+        const leadSrcName = (lead.sourceName || "").toLowerCase();
+        if (leadSrcName !== filters.sourceName.toLowerCase()) return false;
+      }
+
+      // 8. Source Channel (Meta, Google, General, etc.)
+      if (filters.source) {
+        const leadSrc = (lead.source || "").toLowerCase();
+        if (leadSrc !== filters.source.toLowerCase()) return false;
+      }
+
+      // 9. Lead Source / UTM
       if (filters.leadSource) {
-        const leadSrc = (lead.leadSource || "").toLowerCase();
-        if (leadSrc !== filters.leadSource.toLowerCase()) return false;
+        const leadUtm = (lead.leadSource || "").toLowerCase();
+        if (leadUtm !== filters.leadSource.toLowerCase()) return false;
       }
 
-      // 6. Treatment wise
-      if (filters.treatment) {
-        const leadTreat = (lead.lookingForTreatment || lead.treatmentRequired || lead.treatment || "").toLowerCase();
-        if (leadTreat !== filters.treatment.toLowerCase()) return false;
+      // 10. Sub Status
+      const filterSub = filters.subStatus || filters.subDispositions;
+      if (filterSub) {
+        const leadSub = (lead.subStatus || lead.subDispositions || lead.subDisposition || "").toLowerCase();
+        if (leadSub !== filterSub.toLowerCase()) return false;
       }
 
-      // 7. Follow Up Date wise
-      if (!matchesDateRange(lead.followUpDate || lead.followUpDates, filters.followUpDateFrom, filters.followUpDateTo)) {
+      // 11. Lead Stage
+      const filterStage = filters.leadStage || filters.dispositions;
+      if (filterStage) {
+        const leadStage = (lead.leadStage || lead.dispositions || lead.disposition || "").toLowerCase();
+        if (leadStage !== filterStage.toLowerCase()) return false;
+      }
+
+      // 12. Lead Valid Status
+      const filterVal = filters.leadValidStatus || filters.validStatus;
+      if (filterVal) {
+        const leadVal = (lead.leadValidStatus || lead.validStatus || "").toLowerCase();
+        if (leadVal !== filterVal.toLowerCase()) return false;
+      }
+
+      // 13. Follow Up Date
+      if (!matchesDateRange(lead.followUpDate || lead.followUpDates || lead.followUpDateTime, filters.followUpDateFrom, filters.followUpDateTo)) {
         return false;
       }
 
-      // 8. Sub Dispositions wise
-      if (filters.subDispositions) {
-        const leadSub = (lead.subStatus || lead.subDispositions || lead.subDisposition || "").toLowerCase();
-        if (leadSub !== filters.subDispositions.toLowerCase()) return false;
-      }
-
-      // 9. Dispositions wise
-      if (filters.dispositions) {
-        const leadDisp = (lead.leadStage || lead.dispositions || lead.disposition || "").toLowerCase();
-        if (leadDisp !== filters.dispositions.toLowerCase()) return false;
-      }
-
-      // 10. Valid Status wise
-      if (filters.validStatus) {
-        const leadVal = (lead.leadValidStatus || lead.validStatus || "").toLowerCase();
-        if (leadVal !== filters.validStatus.toLowerCase()) return false;
-      }
-
-      // 11. Appointment Date wise
+      // 14. Appointment Date
       if (!matchesDateRange(lead.appointmentDate, filters.appointmentDateFrom, filters.appointmentDateTo)) {
         return false;
       }
 
-      // 12. Surgery Date wise
-      if (!matchesDateRange(lead.surgeryDate, filters.surgeryDateFrom, filters.surgeryDateTo)) {
+      // 15. Centre Visited Date
+      if (!matchesDateRange(lead.centreVisitedDate, filters.centreVisitedDateFrom, filters.centreVisitedDateTo)) {
         return false;
+      }
+
+      // 16. Camp Visited Date
+      if (!matchesDateRange(lead.campVisitedDate, filters.campVisitedDateFrom, filters.campVisitedDateTo)) {
+        return false;
+      }
+
+      // 17. Registration Status
+      if (filters.registrationStatus) {
+        const leadReg = (lead.registrationStatus || "").toLowerCase();
+        if (leadReg !== filters.registrationStatus.toLowerCase()) return false;
+      }
+
+      // 18. Lead Score Range (Min - Max)
+      if (filters.leadScoreMin || filters.leadScoreMax) {
+        const scoreVal = parseInt(String(lead.leadScore || "0").replace(/\D/g, ""), 10) || 0;
+        if (filters.leadScoreMin) {
+          const minVal = parseInt(filters.leadScoreMin, 10);
+          if (!isNaN(minVal) && scoreVal < minVal) return false;
+        }
+        if (filters.leadScoreMax) {
+          const maxVal = parseInt(filters.leadScoreMax, 10);
+          if (!isNaN(maxVal) && scoreVal > maxVal) return false;
+        }
+      }
+
+      // 19. Patient City
+      if (filters.ptCity) {
+        const city = (lead.ptCity || "").toLowerCase();
+        if (!city.includes(filters.ptCity.toLowerCase())) return false;
+      }
+
+      // 20. Patient State
+      if (filters.ptState) {
+        const st = (lead.ptState || "").toLowerCase();
+        if (!st.includes(filters.ptState.toLowerCase())) return false;
+      }
+
+      // 21. When planning treatment
+      if (filters.whenPlanningToStartTreatment) {
+        const when = (lead.whenPlanningToStartTreatment || "").toLowerCase();
+        if (when !== filters.whenPlanningToStartTreatment.toLowerCase()) return false;
+      }
+
+      // 22. Medical condition
+      if (filters.preMedicalConditions) {
+        const med = (lead.preMedicalConditions || "").toLowerCase();
+        if (med !== filters.preMedicalConditions.toLowerCase()) return false;
       }
 
       return true;
@@ -920,7 +1024,10 @@ export default function AgentLeadsPage() {
                 distinctLocations={distinctLocations}
                 distinctCallers={distinctCallers}
                 distinctLeadSources={distinctLeadSources}
-                distinctTreatments={distinctTreatments}
+                distinctCampaignNames={distinctCampaignNames}
+                distinctSourceNames={distinctSourceNames}
+                distinctSources={distinctSources}
+                distinctCampLocations={distinctCampLocations}
                 distinctSubDispositions={distinctSubDispositions}
                 storageKeyPrefix="agent"
               />
@@ -944,7 +1051,7 @@ export default function AgentLeadsPage() {
               </div>
             </div>
 
-{/* Active Filter Chips */}
+            {/* Active Filter Chips */}
             {activeFilterCount > 0 && (
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <span className="text-[11px] font-semibold text-gray-500">Active Filters:</span>
@@ -965,19 +1072,69 @@ export default function AgentLeadsPage() {
                   </span>
                 )}
 
-                {filters.location && (
+                {(filters.centreLocation || filters.location) && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-                    <span>Location: {filters.location}</span>
-                    <button type="button" onClick={() => updateFilter("location", "")} className="hover:text-black">
+                    <span>Centre: {filters.centreLocation || filters.location}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateFilter("centreLocation", "");
+                        updateFilter("location", "");
+                      }}
+                      className="hover:text-black"
+                    >
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 )}
 
-                {filters.callerName && (
+                {filters.campLocation && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-                    <span>Caller: {filters.callerName}</span>
-                    <button type="button" onClick={() => updateFilter("callerName", "")} className="hover:text-black">
+                    <span>Camp: {filters.campLocation}</span>
+                    <button type="button" onClick={() => updateFilter("campLocation", "")} className="hover:text-black">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {(filters.leadOwner || filters.callerName) && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Owner: {filters.leadOwner || filters.callerName}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateFilter("leadOwner", "");
+                        updateFilter("callerName", "");
+                      }}
+                      className="hover:text-black"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.campaignName && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Campaign: {filters.campaignName}</span>
+                    <button type="button" onClick={() => updateFilter("campaignName", "")} className="hover:text-black">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.sourceName && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Source Name: {filters.sourceName}</span>
+                    <button type="button" onClick={() => updateFilter("sourceName", "")} className="hover:text-black">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.source && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Channel: {filters.source}</span>
+                    <button type="button" onClick={() => updateFilter("source", "")} className="hover:text-black">
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -985,17 +1142,56 @@ export default function AgentLeadsPage() {
 
                 {filters.leadSource && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-                    <span>Source: {filters.leadSource}</span>
+                    <span>Source/UTM: {filters.leadSource}</span>
                     <button type="button" onClick={() => updateFilter("leadSource", "")} className="hover:text-black">
                       <X className="w-3 h-3" />
                     </button>
                   </span>
                 )}
 
-                {filters.treatment && (
+                {(filters.subStatus || filters.subDispositions) && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-                    <span>Treatment: {filters.treatment}</span>
-                    <button type="button" onClick={() => updateFilter("treatment", "")} className="hover:text-black">
+                    <span>Sub Status: {filters.subStatus || filters.subDispositions}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateFilter("subStatus", "");
+                        updateFilter("subDispositions", "");
+                      }}
+                      className="hover:text-black"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {(filters.leadStage || filters.dispositions) && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Stage: {filters.leadStage || filters.dispositions}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateFilter("leadStage", "");
+                        updateFilter("dispositions", "");
+                      }}
+                      className="hover:text-black"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {(filters.leadValidStatus || filters.validStatus) && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Valid: {filters.leadValidStatus || filters.validStatus}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateFilter("leadValidStatus", "");
+                        updateFilter("validStatus", "");
+                      }}
+                      className="hover:text-black"
+                    >
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -1017,33 +1213,6 @@ export default function AgentLeadsPage() {
                   </span>
                 )}
 
-                {filters.subDispositions && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-                    <span>Sub Disp: {filters.subDispositions}</span>
-                    <button type="button" onClick={() => updateFilter("subDispositions", "")} className="hover:text-black">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {filters.dispositions && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-                    <span>Disp: {filters.dispositions}</span>
-                    <button type="button" onClick={() => updateFilter("dispositions", "")} className="hover:text-black">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
-                {filters.validStatus && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-                    <span>Status: {filters.validStatus}</span>
-                    <button type="button" onClick={() => updateFilter("validStatus", "")} className="hover:text-black">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                )}
-
                 {(filters.appointmentDateFrom || filters.appointmentDateTo) && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
                     <span>Appt: {filters.appointmentDateFrom || "Start"} to {filters.appointmentDateTo || "End"}</span>
@@ -1060,14 +1229,14 @@ export default function AgentLeadsPage() {
                   </span>
                 )}
 
-                {(filters.surgeryDateFrom || filters.surgeryDateTo) && (
+                {(filters.centreVisitedDateFrom || filters.centreVisitedDateTo) && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-                    <span>Surgery: {filters.surgeryDateFrom || "Start"} to {filters.surgeryDateTo || "End"}</span>
+                    <span>Centre Visited: {filters.centreVisitedDateFrom || "Start"} to {filters.centreVisitedDateTo || "End"}</span>
                     <button
                       type="button"
                       onClick={() => {
-                        updateFilter("surgeryDateFrom", "");
-                        updateFilter("surgeryDateTo", "");
+                        updateFilter("centreVisitedDateFrom", "");
+                        updateFilter("centreVisitedDateTo", "");
                       }}
                       className="hover:text-black"
                     >
@@ -1076,10 +1245,87 @@ export default function AgentLeadsPage() {
                   </span>
                 )}
 
+                {(filters.campVisitedDateFrom || filters.campVisitedDateTo) && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Camp Visited: {filters.campVisitedDateFrom || "Start"} to {filters.campVisitedDateTo || "End"}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateFilter("campVisitedDateFrom", "");
+                        updateFilter("campVisitedDateTo", "");
+                      }}
+                      className="hover:text-black"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {(filters.leadScoreMin || filters.leadScoreMax) && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Lead Score: {filters.leadScoreMin || "0"} - {filters.leadScoreMax || "100"}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateFilter("leadScoreMin", "");
+                        updateFilter("leadScoreMax", "");
+                      }}
+                      className="hover:text-black"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.registrationStatus && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Registered: {filters.registrationStatus}</span>
+                    <button type="button" onClick={() => updateFilter("registrationStatus", "")} className="hover:text-black">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.ptCity && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>City: {filters.ptCity}</span>
+                    <button type="button" onClick={() => updateFilter("ptCity", "")} className="hover:text-black">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.ptState && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>State: {filters.ptState}</span>
+                    <button type="button" onClick={() => updateFilter("ptState", "")} className="hover:text-black">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.whenPlanningToStartTreatment && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Planning: {filters.whenPlanningToStartTreatment}</span>
+                    <button type="button" onClick={() => updateFilter("whenPlanningToStartTreatment", "")} className="hover:text-black">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
+                {filters.quickMetricFilter && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
+                    <span>Filter: {filters.quickMetricFilter === "follow_up" ? "Follow Up Scheduled" : "Unassigned Leads"}</span>
+                    <button type="button" onClick={() => updateFilter("quickMetricFilter", "")} className="hover:text-black">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="text-xs text-rose-400 hover:text-rose-300 underline ml-1"
+                  className="text-xs text-rose-500 hover:text-rose-700 font-bold underline ml-1 cursor-pointer"
                 >
                   Clear all
                 </button>

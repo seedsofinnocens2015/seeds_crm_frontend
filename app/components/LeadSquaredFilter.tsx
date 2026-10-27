@@ -13,69 +13,157 @@ import {
   Check,
   Calendar,
   MapPin,
-  Phone,
+  Tent,
   User,
   Activity,
   FileText,
   Tag,
   Clock,
+  Award,
+  BadgePercent,
+  CheckCircle,
+  Megaphone,
+  Layers,
+  Sparkles,
 } from "lucide-react";
-import { LeadFilters } from "@/app/admin/leads/page";
-import { DISPOSITIONS, VALID_STATUS_LIST } from "@/lib/leadOptions";
+import { LeadFilters } from "@/types/leadFilters";
+import {
+  CENTRE_LOCATIONS,
+  CAMP_LOCATIONS,
+  SUB_DISPOSITIONS,
+  DISPOSITIONS,
+  VALID_STATUS_LIST,
+  LEAD_SOURCES,
+  CAMPAIGN_NAMES,
+  SOURCE_NAMES,
+  WHEN_START_TREATMENT_OPTIONS,
+} from "@/lib/leadOptions";
 
 export interface FilterFieldMeta {
-  key: keyof LeadFilters | "leadEntryDate" | "followUpDate" | "appointmentDate" | "surgeryDate";
+  key: keyof LeadFilters | "leadEntryDate" | "followUpDate" | "appointmentDate" | "centreVisitedDate" | "campVisitedDate" | "leadScoreRange";
   label: string;
-  type: "select" | "dateRange";
+  type: "select" | "dateRange" | "numberRange";
   options?: string[];
   fromKey?: keyof LeadFilters;
   toKey?: keyof LeadFilters;
+  category: "Date & Visits" | "Centres & Camps" | "Disposition & Stage" | "Marketing & Attribution" | "Ownership & Profile";
 }
 
 export const ALL_AVAILABLE_FILTER_FIELDS: FilterFieldMeta[] = [
+  // 1. Centres & Camps
   {
-    key: "dispositions",
+    key: "centreLocation",
+    label: "Centre Location",
+    type: "select",
+    options: [...CENTRE_LOCATIONS],
+    category: "Centres & Camps",
+  },
+  {
+    key: "campLocation",
+    label: "Camp Location",
+    type: "select",
+    options: [...CAMP_LOCATIONS],
+    category: "Centres & Camps",
+  },
+
+  // 2. Disposition & Stage
+  {
+    key: "subStatus",
+    label: "Sub Status",
+    type: "select",
+    options: [...SUB_DISPOSITIONS],
+    category: "Disposition & Stage",
+  },
+  {
+    key: "leadStage",
     label: "Lead Stage",
     type: "select",
     options: [...DISPOSITIONS],
+    category: "Disposition & Stage",
   },
   {
-    key: "subDispositions",
-    label: "Sub Status",
-    type: "select",
-  },
-  {
-    key: "leadSource",
-    label: "Lead Source",
-    type: "select",
-  },
-  {
-    key: "callerName",
-    label: "Lead Owner / Caller",
-    type: "select",
-  },
-  {
-    key: "location",
-    label: "Center / Location",
-    type: "select",
-  },
-  {
-    key: "treatment",
-    label: "Treatment",
-    type: "select",
-  },
-  {
-    key: "validStatus",
+    key: "leadValidStatus",
     label: "Valid Status",
     type: "select",
     options: [...VALID_STATUS_LIST],
+    category: "Disposition & Stage",
+  },
+
+  // 3. Marketing & Attribution
+  {
+    key: "campaignName",
+    label: "Campaign Name",
+    type: "select",
+    options: [...CAMPAIGN_NAMES],
+    category: "Marketing & Attribution",
   },
   {
+    key: "sourceName",
+    label: "Source Name",
+    type: "select",
+    options: [...SOURCE_NAMES],
+    category: "Marketing & Attribution",
+  },
+  {
+    key: "source",
+    label: "Source Channel",
+    type: "select",
+    options: ["Meta", "Google", "General", "Aisensy", "WhatsApp Direct", "Website"],
+    category: "Marketing & Attribution",
+  },
+  {
+    key: "leadSource",
+    label: "Lead Source / UTM",
+    type: "select",
+    options: [...LEAD_SOURCES],
+    category: "Marketing & Attribution",
+  },
+
+  // 4. Ownership & Quality / Profile
+  {
+    key: "leadOwner",
+    label: "Lead Owner / Caller",
+    type: "select",
+    category: "Ownership & Profile",
+  },
+  {
+    key: "registrationStatus",
+    label: "Registration Status",
+    type: "select",
+    options: ["Yes", "No"],
+    category: "Ownership & Profile",
+  },
+  {
+    key: "leadScoreRange",
+    label: "Lead Score (Min - Max)",
+    type: "numberRange",
+    fromKey: "leadScoreMin",
+    toKey: "leadScoreMax",
+    category: "Ownership & Profile",
+  },
+  {
+    key: "whenPlanningToStartTreatment",
+    label: "Treatment Plan Timeline",
+    type: "select",
+    options: [...WHEN_START_TREATMENT_OPTIONS],
+    category: "Ownership & Profile",
+  },
+  {
+    key: "preMedicalConditions",
+    label: "Medical Condition (Yes/No)",
+    type: "select",
+    options: ["Yes", "No"],
+    category: "Ownership & Profile",
+  },
+
+  // 5. Date & Visits
+  {
     key: "leadEntryDate",
-    label: "Created On / Lead Entry Date",
+    label: "Lead Entry Date / Created On",
     type: "dateRange",
     fromKey: "leadEntryDateFrom",
     toKey: "leadEntryDateTo",
+    category: "Date & Visits",
   },
   {
     key: "followUpDate",
@@ -83,6 +171,7 @@ export const ALL_AVAILABLE_FILTER_FIELDS: FilterFieldMeta[] = [
     type: "dateRange",
     fromKey: "followUpDateFrom",
     toKey: "followUpDateTo",
+    category: "Date & Visits",
   },
   {
     key: "appointmentDate",
@@ -90,21 +179,31 @@ export const ALL_AVAILABLE_FILTER_FIELDS: FilterFieldMeta[] = [
     type: "dateRange",
     fromKey: "appointmentDateFrom",
     toKey: "appointmentDateTo",
+    category: "Date & Visits",
   },
   {
-    key: "surgeryDate",
-    label: "Surgery Date",
+    key: "centreVisitedDate",
+    label: "Centre Visited Date",
     type: "dateRange",
-    fromKey: "surgeryDateFrom",
-    toKey: "surgeryDateTo",
+    fromKey: "centreVisitedDateFrom",
+    toKey: "centreVisitedDateTo",
+    category: "Date & Visits",
+  },
+  {
+    key: "campVisitedDate",
+    label: "Camp Visited Date",
+    type: "dateRange",
+    fromKey: "campVisitedDateFrom",
+    toKey: "campVisitedDateTo",
+    category: "Date & Visits",
   },
 ];
 
 const DEFAULT_PINNED_FIELD_KEYS: string[] = [
-  "dispositions",
-  "leadSource",
-  "callerName",
-  "location",
+  "centreLocation",
+  "subStatus",
+  "leadOwner",
+  "campaignName",
 ];
 
 interface LeadSquaredFilterProps {
@@ -112,11 +211,14 @@ interface LeadSquaredFilterProps {
   updateFilter: (key: keyof LeadFilters, value: string) => void;
   handleResetFilters: () => void;
   activeFilterCount: number;
-  distinctLocations: string[];
-  distinctCallers: string[];
-  distinctLeadSources: string[];
-  distinctTreatments: string[];
-  distinctSubDispositions: string[];
+  distinctLocations?: string[];
+  distinctCallers?: string[];
+  distinctLeadSources?: string[];
+  distinctCampaignNames?: string[];
+  distinctSourceNames?: string[];
+  distinctSources?: string[];
+  distinctCampLocations?: string[];
+  distinctSubDispositions?: string[];
   storageKeyPrefix?: string;
 }
 
@@ -125,11 +227,14 @@ export default function LeadSquaredFilter({
   updateFilter,
   handleResetFilters,
   activeFilterCount,
-  distinctLocations,
-  distinctCallers,
-  distinctLeadSources,
-  distinctTreatments,
-  distinctSubDispositions,
+  distinctLocations = [],
+  distinctCallers = [],
+  distinctLeadSources = [],
+  distinctCampaignNames = [],
+  distinctSourceNames = [],
+  distinctSources = [],
+  distinctCampLocations = [],
+  distinctSubDispositions = [],
   storageKeyPrefix = "admin",
 }: LeadSquaredFilterProps) {
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
@@ -144,7 +249,10 @@ export default function LeadSquaredFilter({
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(`crm_pinned_filters_${storageKeyPrefix}`);
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
       } catch (e) {}
     }
     return DEFAULT_PINNED_FIELD_KEYS;
@@ -181,21 +289,50 @@ export default function LeadSquaredFilter({
     savePinnedFilters(updated);
   };
 
-  // Populate dynamic options
+  // Populate dynamic options merged with presets
   const filterFieldsWithDynamicOptions = useMemo(() => {
     return ALL_AVAILABLE_FILTER_FIELDS.map((field) => {
-      if (field.key === "location") return { ...field, options: distinctLocations };
-      if (field.key === "callerName") return { ...field, options: distinctCallers };
-      if (field.key === "leadSource") return { ...field, options: distinctLeadSources };
-      if (field.key === "treatment") return { ...field, options: distinctTreatments };
-      if (field.key === "subDispositions") return { ...field, options: distinctSubDispositions };
+      if (field.key === "centreLocation") {
+        const merged = Array.from(new Set([...CENTRE_LOCATIONS, ...distinctLocations])).filter(Boolean).sort();
+        return { ...field, options: merged };
+      }
+      if (field.key === "campLocation") {
+        const merged = Array.from(new Set([...CAMP_LOCATIONS, ...distinctCampLocations])).filter(Boolean).sort();
+        return { ...field, options: merged };
+      }
+      if (field.key === "leadOwner") {
+        return { ...field, options: distinctCallers.filter(Boolean) };
+      }
+      if (field.key === "campaignName") {
+        const merged = Array.from(new Set([...CAMPAIGN_NAMES, ...distinctCampaignNames])).filter(Boolean).sort();
+        return { ...field, options: merged };
+      }
+      if (field.key === "sourceName") {
+        const merged = Array.from(new Set([...SOURCE_NAMES, ...distinctSourceNames])).filter(Boolean).sort();
+        return { ...field, options: merged };
+      }
+      if (field.key === "source") {
+        const merged = Array.from(new Set(["Meta", "Google", "General", "Aisensy", "WhatsApp Direct", "Website", ...distinctSources])).filter(Boolean);
+        return { ...field, options: merged };
+      }
+      if (field.key === "leadSource") {
+        const merged = Array.from(new Set([...LEAD_SOURCES, ...distinctLeadSources])).filter(Boolean).sort();
+        return { ...field, options: merged };
+      }
+      if (field.key === "subStatus") {
+        const merged = Array.from(new Set([...SUB_DISPOSITIONS, ...distinctSubDispositions])).filter(Boolean).sort();
+        return { ...field, options: merged };
+      }
       return field;
     });
   }, [
     distinctLocations,
     distinctCallers,
     distinctLeadSources,
-    distinctTreatments,
+    distinctCampaignNames,
+    distinctSourceNames,
+    distinctSources,
+    distinctCampLocations,
     distinctSubDispositions,
   ]);
 
@@ -231,15 +368,15 @@ export default function LeadSquaredFilter({
           )}
         </button>
 
-        {/* LeadSquared Filter Dropdown Menu (Matches Screenshot 1) */}
+        {/* LeadSquared Filter Dropdown Menu */}
         {isFilterDropdownOpen && (
-          <div className="absolute left-0 top-full mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 text-xs">
+          <div className="absolute left-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 text-xs">
             {/* Search input in dropdown */}
             <div className="p-2.5 border-b border-slate-100 relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search here"
+                placeholder="Search filters (e.g. Centre, Source, Score)..."
                 value={dropdownSearch}
                 onChange={(e) => setDropdownSearch(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#cc2727]"
@@ -249,20 +386,21 @@ export default function LeadSquaredFilter({
             <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
               {/* Pinned filters summary banner */}
               <div className="p-3 bg-slate-50/50">
-                <div className="text-[11px] font-semibold text-slate-500 mb-2">
-                  Pinned filters {pinnedFieldKeys.length}/20
+                <div className="text-[11px] font-semibold text-slate-500 mb-1 flex items-center justify-between">
+                  <span>Pinned filters</span>
+                  <span className="font-bold text-[#cc2727]">{pinnedFieldKeys.length}/20</span>
                 </div>
-                <div className="p-2.5 rounded-lg bg-sky-50/70 border border-sky-100 text-[11px] text-slate-600 flex items-start gap-2">
+                <div className="p-2 rounded-lg bg-sky-50/70 border border-sky-100 text-[11px] text-slate-600 flex items-start gap-2">
                   <Pin className="w-3.5 h-3.5 text-sky-600 shrink-0 mt-0.5" />
-                  <span>Pin most frequently used filters to always see them on top.</span>
+                  <span>Pin your most frequent filters to keep quick-access pills visible.</span>
                 </div>
               </div>
 
-              {/* Pinned list items (if search matches) */}
+              {/* Pinned list items */}
               {pinnedFields.length > 0 && (
                 <div className="py-1">
                   <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Pinned
+                    Pinned Filters
                   </div>
                   {pinnedFields
                     .filter((f) => f.label.toLowerCase().includes(dropdownSearch.toLowerCase()))
@@ -275,7 +413,12 @@ export default function LeadSquaredFilter({
                           setIsFilterDropdownOpen(false);
                         }}
                       >
-                        <span className="text-slate-700 font-medium">{f.label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-700 font-medium">{f.label}</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                            {f.category}
+                          </span>
+                        </div>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -295,7 +438,7 @@ export default function LeadSquaredFilter({
               {/* Other Filters Section */}
               <div className="py-1">
                 <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Other Filters
+                  Available Filters
                 </div>
                 {otherFields
                   .filter((f) => f.label.toLowerCase().includes(dropdownSearch.toLowerCase()))
@@ -308,7 +451,12 @@ export default function LeadSquaredFilter({
                         setIsFilterDropdownOpen(false);
                       }}
                     >
-                      <span className="text-slate-700 font-medium">{f.label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-700 font-medium">{f.label}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                          {f.category}
+                        </span>
+                      </div>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -333,10 +481,10 @@ export default function LeadSquaredFilter({
                   setIsFilterDropdownOpen(false);
                   setIsAdvancedModalOpen(true);
                 }}
-                className="w-full py-1.5 px-3 rounded-lg text-slate-700 hover:bg-white hover:shadow-xs flex items-center justify-center gap-2 font-semibold text-xs transition-colors cursor-pointer"
+                className="w-full py-1.5 px-3 rounded-lg bg-white border border-slate-200 text-slate-800 hover:bg-slate-50 hover:shadow-xs flex items-center justify-center gap-2 font-bold text-xs transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5 text-[#cc2727]" />
-                <span>Advanced Filters</span>
+                <Sliders className="w-3.5 h-3.5 text-[#cc2727]" />
+                <span>Open Advanced Filters Modal</span>
               </button>
 
               <button
@@ -349,14 +497,14 @@ export default function LeadSquaredFilter({
                 className="w-full py-1.5 px-3 rounded-lg text-slate-600 hover:bg-white hover:shadow-xs flex items-center justify-center gap-2 font-medium text-xs transition-colors cursor-pointer"
               >
                 <Settings className="w-3.5 h-3.5 text-slate-500" />
-                <span>Configure Fields</span>
+                <span>Configure Pinned Fields</span>
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* 2. Instant Pinned Filter Pills Next to Search Bar */}
+      {/* 2. Instant Pinned Filter Pills */}
       {pinnedFields.map((field) => {
         let isFieldActive = false;
         let activeValueLabel = "";
@@ -365,14 +513,21 @@ export default function LeadSquaredFilter({
           const val = filters[field.key as keyof LeadFilters];
           if (val) {
             isFieldActive = true;
-            activeValueLabel = val;
+            activeValueLabel = String(val);
           }
         } else if (field.type === "dateRange") {
           const from = filters[field.fromKey!];
           const to = filters[field.toKey!];
           if (from || to) {
             isFieldActive = true;
-            activeValueLabel = `${from || "Start"} - ${to || "End"}`;
+            activeValueLabel = `${from || "Start"} to ${to || "End"}`;
+          }
+        } else if (field.type === "numberRange") {
+          const min = filters[field.fromKey!];
+          const max = filters[field.toKey!];
+          if (min || max) {
+            isFieldActive = true;
+            activeValueLabel = `${min || "0"} - ${max || "100"}`;
           }
         }
 
@@ -391,7 +546,7 @@ export default function LeadSquaredFilter({
             >
               <span>{field.label}</span>
               {isFieldActive && (
-                <span className="font-bold text-[#cc2727] truncate max-w-[120px]">
+                <span className="font-bold text-[#cc2727] truncate max-w-[130px]">
                   : {activeValueLabel}
                 </span>
               )}
@@ -400,9 +555,9 @@ export default function LeadSquaredFilter({
 
             {/* Instant Filter Dropdown Picker */}
             {isPickerOpen && (
-              <div className="absolute left-0 top-full mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 text-xs animate-in fade-in slide-in-from-top-1">
+              <div className="absolute left-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-xl z-50 p-2 text-xs animate-in fade-in slide-in-from-top-1">
                 {field.type === "select" ? (
-                  <div className="space-y-1 max-h-56 overflow-y-auto">
+                  <div className="space-y-1 max-h-60 overflow-y-auto">
                     <button
                       type="button"
                       onClick={() => {
@@ -411,7 +566,7 @@ export default function LeadSquaredFilter({
                       }}
                       className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-100 text-slate-500 font-medium"
                     >
-                      All / Clear
+                      All / Clear Selection
                     </button>
                     {(field.options || []).map((opt) => {
                       const isSelected = filters[field.key as keyof LeadFilters] === opt;
@@ -435,11 +590,11 @@ export default function LeadSquaredFilter({
                       );
                     })}
                   </div>
-                ) : (
+                ) : field.type === "dateRange" ? (
                   <div className="p-2 space-y-2.5">
                     <div>
                       <span className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                        From
+                        From Date
                       </span>
                       <input
                         type="date"
@@ -450,13 +605,64 @@ export default function LeadSquaredFilter({
                     </div>
                     <div>
                       <span className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                        To
+                        To Date
                       </span>
                       <input
                         type="date"
                         value={filters[field.toKey!]}
                         onChange={(e) => updateFilter(field.toKey!, e.target.value)}
                         className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs text-slate-800 [color-scheme:light]"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-1 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateFilter(field.fromKey!, "");
+                          updateFilter(field.toKey!, "");
+                          setOpenInstantField(null);
+                        }}
+                        className="px-2.5 py-1 text-slate-500 hover:text-slate-800"
+                      >
+                        Clear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOpenInstantField(null)}
+                        className="px-3 py-1 bg-[#cc2727] text-white rounded font-medium text-xs shadow-xs"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-2 space-y-2.5">
+                    <div>
+                      <span className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                        Min Lead Score
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        placeholder="e.g. 10"
+                        value={filters[field.fromKey!]}
+                        onChange={(e) => updateFilter(field.fromKey!, e.target.value)}
+                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs text-slate-800"
+                      />
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                        Max Lead Score
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        placeholder="e.g. 50"
+                        value={filters[field.toKey!]}
+                        onChange={(e) => updateFilter(field.toKey!, e.target.value)}
+                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs text-slate-800"
                       />
                     </div>
                     <div className="flex justify-end gap-2 pt-1 border-t border-slate-100">
@@ -500,7 +706,7 @@ export default function LeadSquaredFilter({
         </button>
       )}
 
-      {/* 4. Configure Filter Fields Modal (Exact Screenshot 2 Match) */}
+      {/* 4. Configure Filter Fields Modal */}
       {isConfigureModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-sm bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
@@ -527,7 +733,7 @@ export default function LeadSquaredFilter({
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search here"
+                  placeholder="Search fields to pin..."
                   value={configureSearch}
                   onChange={(e) => setConfigureSearch(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#cc2727]"
@@ -544,21 +750,26 @@ export default function LeadSquaredFilter({
                   return (
                     <label
                       key={f.key}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-slate-50 cursor-pointer select-none"
+                      className="flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-slate-50 cursor-pointer select-none"
                     >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {
-                          setTempConfiguredKeys((prev) =>
-                            prev.includes(f.key)
-                              ? prev.filter((k) => k !== f.key)
-                              : [...prev, f.key]
-                          );
-                        }}
-                        className="w-4 h-4 rounded border-slate-300 text-[#cc2727] focus:ring-[#cc2727] cursor-pointer"
-                      />
-                      <span className="text-slate-700 font-medium">{f.label}</span>
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            setTempConfiguredKeys((prev) =>
+                              prev.includes(f.key)
+                                ? prev.filter((k) => k !== f.key)
+                                : [...prev, f.key]
+                            );
+                          }}
+                          className="w-4 h-4 rounded border-slate-300 text-[#cc2727] focus:ring-[#cc2727] cursor-pointer"
+                        />
+                        <span className="text-slate-700 font-medium">{f.label}</span>
+                      </div>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                        {f.category}
+                      </span>
                     </label>
                   );
                 })}
@@ -588,10 +799,10 @@ export default function LeadSquaredFilter({
         </div>
       )}
 
-      {/* 5. Full Advanced Filters Popup Modal */}
+      {/* 5. Comprehensive Categorized Advanced Filters Modal */}
       {isAdvancedModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-4xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-5xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
               <div className="flex items-center gap-2.5">
@@ -601,7 +812,7 @@ export default function LeadSquaredFilter({
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Advanced Lead Filters</h3>
                   <p className="text-xs text-slate-500">
-                    Apply comprehensive multi-field filtering criteria
+                    Comprehensive multi-field filtering criteria mapped with 49 CRM columns
                   </p>
                 </div>
               </div>
@@ -614,27 +825,335 @@ export default function LeadSquaredFilter({
               </button>
             </div>
 
-            {/* Form Fields Grid */}
-            <div className="p-6 overflow-y-auto space-y-5 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* 1. Lead Entry Date */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Lead Entry Date</span>
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="block text-[10px] text-slate-500">From</span>
+            {/* Modal Body - Categorized Sections */}
+            <div className="p-6 overflow-y-auto space-y-6 text-xs bg-slate-50/50">
+              {/* Category 1: Centres & Camps */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <MapPin className="w-4 h-4 text-[#cc2727]" />
+                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                    Centres & Camps
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Centre Location
+                    </label>
+                    <select
+                      value={filters.centreLocation || filters.location || ""}
+                      onChange={(e) => updateFilter("centreLocation", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All Centres</option>
+                      {CENTRE_LOCATIONS.map((loc) => (
+                        <option key={loc} value={loc}>
+                          {loc}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Camp Location
+                    </label>
+                    <select
+                      value={filters.campLocation || ""}
+                      onChange={(e) => updateFilter("campLocation", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All Camps / NA</option>
+                      {CAMP_LOCATIONS.map((camp) => (
+                        <option key={camp} value={camp}>
+                          {camp}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Patient City / State
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="City"
+                        value={filters.ptCity || ""}
+                        onChange={(e) => updateFilter("ptCity", e.target.value)}
+                        className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="State"
+                        value={filters.ptState || ""}
+                        onChange={(e) => updateFilter("ptState", e.target.value)}
+                        className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category 2: Status & Disposition */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <Activity className="w-4 h-4 text-[#cc2727]" />
+                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                    Status & Disposition
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Sub Status (40 Options)
+                    </label>
+                    <select
+                      value={filters.subStatus || filters.subDispositions || ""}
+                      onChange={(e) => updateFilter("subStatus", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All Sub Statuses</option>
+                      {SUB_DISPOSITIONS.map((sub: string) => (
+                        <option key={sub} value={sub}>
+                          {sub}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Lead Stage
+                    </label>
+                    <select
+                      value={filters.leadStage || filters.dispositions || ""}
+                      onChange={(e) => updateFilter("leadStage", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All Lead Stages</option>
+                      {DISPOSITIONS.map((stg: string) => (
+                        <option key={stg} value={stg}>
+                          {stg}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Valid Status
+                    </label>
+                    <select
+                      value={filters.leadValidStatus || filters.validStatus || ""}
+                      onChange={(e) => updateFilter("leadValidStatus", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All Valid Statuses</option>
+                      {VALID_STATUS_LIST.map((vs: string) => (
+                        <option key={vs} value={vs}>
+                          {vs}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category 3: Marketing & Attribution */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <Megaphone className="w-4 h-4 text-[#cc2727]" />
+                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                    Marketing & Attribution (Campaign, Source & Channel)
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Campaign Name
+                    </label>
+                    <select
+                      value={filters.campaignName || ""}
+                      onChange={(e) => updateFilter("campaignName", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All Campaigns</option>
+                      {CAMPAIGN_NAMES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Source (Channel)
+                    </label>
+                    <select
+                      value={filters.source || ""}
+                      onChange={(e) => updateFilter("source", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All Sources</option>
+                      <option value="Meta">Meta</option>
+                      <option value="Google">Google</option>
+                      <option value="General">General</option>
+                      <option value="Aisensy">Aisensy</option>
+                      <option value="WhatsApp Direct">WhatsApp Direct</option>
+                      <option value="Website">Website</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Source Name (DID/Phone)
+                    </label>
+                    <select
+                      value={filters.sourceName || ""}
+                      onChange={(e) => updateFilter("sourceName", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All Source Names</option>
+                      {SOURCE_NAMES.map((sn) => (
+                        <option key={sn} value={sn}>
+                          {sn}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Lead Source / UTM
+                    </label>
+                    <select
+                      value={filters.leadSource || ""}
+                      onChange={(e) => updateFilter("leadSource", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All UTM Sources</option>
+                      {LEAD_SOURCES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category 4: Quality, Lead Score & Profile */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <Award className="w-4 h-4 text-[#cc2727]" />
+                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                    Quality, Lead Score & Patient Profile
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Lead Owner / Caller
+                    </label>
+                    <select
+                      value={filters.leadOwner || filters.callerName || ""}
+                      onChange={(e) => updateFilter("leadOwner", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All Owners / Callers</option>
+                      {distinctCallers.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Lead Score Range (0 - 100)
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        placeholder="Min (e.g. 15)"
+                        value={filters.leadScoreMin || ""}
+                        onChange={(e) => updateFilter("leadScoreMin", e.target.value)}
+                        className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        placeholder="Max (e.g. 50)"
+                        value={filters.leadScoreMax || ""}
+                        onChange={(e) => updateFilter("leadScoreMax", e.target.value)}
+                        className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Registration Status
+                    </label>
+                    <select
+                      value={filters.registrationStatus || ""}
+                      onChange={(e) => updateFilter("registrationStatus", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All</option>
+                      <option value="Yes">Yes (Registered)</option>
+                      <option value="No">No (Not Registered)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      When Planning Treatment
+                    </label>
+                    <select
+                      value={filters.whenPlanningToStartTreatment || ""}
+                      onChange={(e) => updateFilter("whenPlanningToStartTreatment", e.target.value)}
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                    >
+                      <option value="">All Timelines</option>
+                      {WHEN_START_TREATMENT_OPTIONS.map((w) => (
+                        <option key={w} value={w}>
+                          {w}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category 5: Date Ranges (Lead Entry, Follow Up, Appointment, Centre Visit, Camp Visit) */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <Calendar className="w-4 h-4 text-[#cc2727]" />
+                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                    Date Ranges & Visit Schedules
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {/* Lead Entry Date */}
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Lead Entry Date / Created On
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
                       <input
                         type="date"
                         value={filters.leadEntryDateFrom}
                         onChange={(e) => updateFilter("leadEntryDateFrom", e.target.value)}
                         className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-xs [color-scheme:light]"
                       />
-                    </div>
-                    <div>
-                      <span className="block text-[10px] text-slate-500">To</span>
                       <input
                         type="date"
                         value={filters.leadEntryDateTo}
@@ -643,166 +1162,19 @@ export default function LeadSquaredFilter({
                       />
                     </div>
                   </div>
-                </div>
 
-                {/* 2. Center Location */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Center Location</span>
-                  </label>
-                  <select
-                    value={filters.location}
-                    onChange={(e) => updateFilter("location", e.target.value)}
-                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                  >
-                    <option value="">All Locations</option>
-                    {distinctLocations.map((loc) => (
-                      <option key={loc} value={loc}>
-                        {loc}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 3. Caller Name / Lead Owner */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Lead Owner / Caller</span>
-                  </label>
-                  <select
-                    value={filters.callerName}
-                    onChange={(e) => updateFilter("callerName", e.target.value)}
-                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                  >
-                    <option value="">All Owners / Callers</option>
-                    {distinctCallers.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 4. Lead Source */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Lead Source</span>
-                  </label>
-                  <select
-                    value={filters.leadSource}
-                    onChange={(e) => updateFilter("leadSource", e.target.value)}
-                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                  >
-                    <option value="">All Sources</option>
-                    {distinctLeadSources.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 5. Treatment */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Treatment</span>
-                  </label>
-                  <select
-                    value={filters.treatment}
-                    onChange={(e) => updateFilter("treatment", e.target.value)}
-                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                  >
-                    <option value="">All Treatments</option>
-                    {distinctTreatments.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 6. Lead Stage / Disposition */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Lead Stage / Disposition</span>
-                  </label>
-                  <select
-                    value={filters.dispositions}
-                    onChange={(e) => updateFilter("dispositions", e.target.value)}
-                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                  >
-                    <option value="">All Stages</option>
-                    {DISPOSITIONS.map((disp) => (
-                      <option key={disp} value={disp}>
-                        {disp}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 7. Sub Disposition */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Sub Disposition</span>
-                  </label>
-                  <select
-                    value={filters.subDispositions}
-                    onChange={(e) => updateFilter("subDispositions", e.target.value)}
-                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                  >
-                    <option value="">All Sub Dispositions</option>
-                    {distinctSubDispositions.map((sd) => (
-                      <option key={sd} value={sd}>
-                        {sd}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 8. Valid Status */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Check className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Valid Status</span>
-                  </label>
-                  <select
-                    value={filters.validStatus}
-                    onChange={(e) => updateFilter("validStatus", e.target.value)}
-                    className="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-lg text-xs"
-                  >
-                    <option value="">All Statuses</option>
-                    {VALID_STATUS_LIST.map((val) => (
-                      <option key={val} value={val}>
-                        {val}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 9. Follow Up Date */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Follow Up Date</span>
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="block text-[10px] text-slate-500">From</span>
+                  {/* Follow Up Date */}
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Follow Up Date
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
                       <input
                         type="date"
                         value={filters.followUpDateFrom}
                         onChange={(e) => updateFilter("followUpDateFrom", e.target.value)}
                         className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-xs [color-scheme:light]"
                       />
-                    </div>
-                    <div>
-                      <span className="block text-[10px] text-slate-500">To</span>
                       <input
                         type="date"
                         value={filters.followUpDateTo}
@@ -811,26 +1183,19 @@ export default function LeadSquaredFilter({
                       />
                     </div>
                   </div>
-                </div>
 
-                {/* 10. Appointment Date */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Appointment Date</span>
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="block text-[10px] text-slate-500">From</span>
+                  {/* Appointment Date */}
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Appointment Date
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
                       <input
                         type="date"
                         value={filters.appointmentDateFrom}
                         onChange={(e) => updateFilter("appointmentDateFrom", e.target.value)}
                         className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-xs [color-scheme:light]"
                       />
-                    </div>
-                    <div>
-                      <span className="block text-[10px] text-slate-500">To</span>
                       <input
                         type="date"
                         value={filters.appointmentDateTo}
@@ -839,30 +1204,44 @@ export default function LeadSquaredFilter({
                       />
                     </div>
                   </div>
-                </div>
 
-                {/* 11. Surgery Date */}
-                <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#cc2727]" />
-                    <span>Surgery Date</span>
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="block text-[10px] text-slate-500">From</span>
+                  {/* Centre Visited Date */}
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Centre Visited Date
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
                       <input
                         type="date"
-                        value={filters.surgeryDateFrom}
-                        onChange={(e) => updateFilter("surgeryDateFrom", e.target.value)}
+                        value={filters.centreVisitedDateFrom || ""}
+                        onChange={(e) => updateFilter("centreVisitedDateFrom", e.target.value)}
+                        className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-xs [color-scheme:light]"
+                      />
+                      <input
+                        type="date"
+                        value={filters.centreVisitedDateTo || ""}
+                        onChange={(e) => updateFilter("centreVisitedDateTo", e.target.value)}
                         className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-xs [color-scheme:light]"
                       />
                     </div>
-                    <div>
-                      <span className="block text-[10px] text-slate-500">To</span>
+                  </div>
+
+                  {/* Camp Visited Date */}
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Camp Visited Date
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
                       <input
                         type="date"
-                        value={filters.surgeryDateTo}
-                        onChange={(e) => updateFilter("surgeryDateTo", e.target.value)}
+                        value={filters.campVisitedDateFrom || ""}
+                        onChange={(e) => updateFilter("campVisitedDateFrom", e.target.value)}
+                        className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-xs [color-scheme:light]"
+                      />
+                      <input
+                        type="date"
+                        value={filters.campVisitedDateTo || ""}
+                        onChange={(e) => updateFilter("campVisitedDateTo", e.target.value)}
                         className="w-full px-2 py-1.5 bg-white border border-slate-300 rounded text-xs [color-scheme:light]"
                       />
                     </div>
@@ -876,17 +1255,22 @@ export default function LeadSquaredFilter({
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="px-3 py-1.5 text-rose-600 hover:text-rose-700 font-semibold text-xs transition-colors"
+                className="px-3 py-1.5 text-rose-600 hover:text-rose-700 font-semibold text-xs transition-colors cursor-pointer"
               >
                 Clear All Filters
               </button>
-              <button
-                type="button"
-                onClick={() => setIsAdvancedModalOpen(false)}
-                className="px-5 py-2 bg-[#cc2727] hover:bg-[#b02121] text-white rounded-xl text-xs font-bold shadow-md shadow-[#cc2727]/25"
-              >
-                Apply Filters
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 font-medium">
+                  {activeFilterCount} filter(s) active
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsAdvancedModalOpen(false)}
+                  className="px-5 py-2 bg-[#cc2727] hover:bg-[#b02121] text-white rounded-xl text-xs font-bold shadow-md shadow-[#cc2727]/25 cursor-pointer"
+                >
+                  Apply Filters
+                </button>
+              </div>
             </div>
           </div>
         </div>

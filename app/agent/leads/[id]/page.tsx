@@ -20,11 +20,17 @@ import {
   Clock,
   Heart,
   Building,
+  Edit3,
 } from "lucide-react";
 import AgentSidebar from "@/app/components/AgentSidebar";
 import Footer from "@/app/components/Footer";
-import LeadAuditHistory, { AuditLog } from "@/app/components/LeadAuditHistory";
-import NotesHistory, { NoteHistoryItem } from "@/app/components/NotesHistory";
+import LeadSquaredTabsHeader, { LeadDetailTab } from "@/app/components/LeadSquaredTabsHeader";
+import LeadSquaredActivityHistory from "@/app/components/LeadSquaredActivityHistory";
+import LeadSquaredAuditTrail from "@/app/components/LeadSquaredAuditTrail";
+import LeadSquaredLeadDetails from "@/app/components/LeadSquaredLeadDetails";
+import LeadSquaredNotes from "@/app/components/LeadSquaredNotes";
+import EditLeadModal from "@/app/components/EditLeadModal";
+import AddNoteModal from "@/app/components/AddNoteModal";
 import {
   CENTRE_LOCATIONS,
   CAMP_LOCATIONS,
@@ -38,10 +44,6 @@ import {
   SOURCE_NAME_TO_INFO,
   GENERAL_SOURCES,
   SUB_DISPOSITIONS_MAP,
-  formatDateToDDMMMYY,
-  parseDDMMMYYToISO,
-  getTodayDDMMMYY,
-  getFormattedTimestamp,
   notifyLeadUpdated,
 } from "@/lib/leadOptions";
 import { IFormField } from "@/types/formConfig";
@@ -91,13 +93,18 @@ export default function LeadDetailPage({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<LeadDetailTab>("activity_history");
+  const [hideEmptyFields, setHideEmptyFields] = useState(false);
   const [error, setError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [callerOptions, setCallerOptions] = useState<string[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [notesHistory, setNotesHistory] = useState<NoteHistoryItem[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [notesHistory, setNotesHistory] = useState<any[]>([]);
   const [formFields, setFormFields] = useState<IFormField[]>(DEFAULT_FORM_FIELDS);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+
   const [subDispositionMappings, setSubDispositionMappings] = useState<
     Record<string, { disposition: string; validStatus: string }>
   >({ ...SUB_DISPOSITIONS_MAP });
@@ -167,7 +174,6 @@ export default function LeadDetailPage({
   });
 
   const applyLeadData = (l: any) => {
-    // Phone splits
     const pPhone = splitPhone(l.primaryMobileNumber || l.mobileNumber || l.phoneNumber);
     setPrimaryCountryCode(pPhone.code);
     setPrimaryRawPhone(pPhone.raw);
@@ -235,7 +241,7 @@ export default function LeadDetailPage({
       registrationAmount: l.registrationAmount || "",
       package: l.package || "",
       plan: l.plan || "",
-      notes: "", // keep clean for new remarks entry
+      notes: l.notes || "",
     });
 
     if (l.customFields) {
@@ -257,57 +263,57 @@ export default function LeadDetailPage({
     }
   }, [leadId]);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [meRes, cfgRes, membersRes, leadRes] = await Promise.all([
-          fetch("/api/auth/me"),
-          fetch("/api/admin/form-config").catch(() => null),
-          fetch("/api/admin/members").catch(() => null),
-          fetch(`/api/agent/leads/${leadId}`, { cache: "no-store" }),
-        ]);
+  const loadData = async () => {
+    try {
+      const [meRes, cfgRes, membersRes, leadRes] = await Promise.all([
+        fetch("/api/auth/me"),
+        fetch("/api/admin/form-config").catch(() => null),
+        fetch("/api/admin/members").catch(() => null),
+        fetch(`/api/agent/leads/${leadId}`, { cache: "no-store" }),
+      ]);
 
-        if (!meRes.ok) {
-          router.push("/agent/login");
-          return;
-        }
-        const meData = await meRes.json();
-        if (!meData.user || (meData.user.role !== "agent" && meData.user.role !== "admin")) {
-          router.push("/agent/login");
-          return;
-        }
-        setUser(meData.user);
-
-        if (cfgRes && cfgRes.ok) {
-          const cfgData = await cfgRes.json();
-          if (cfgData.config?.fields && Array.isArray(cfgData.config.fields)) {
-            setFormFields(cfgData.config.fields);
-          }
-          if (cfgData.config?.subDispositionMappings && Object.keys(cfgData.config.subDispositionMappings).length > 0) {
-            setSubDispositionMappings(cfgData.config.subDispositionMappings);
-          }
-        }
-
-        if (membersRes && membersRes.ok) {
-          const mData = await membersRes.json();
-          const names = (mData.members || []).map((m: any) => m.name).filter(Boolean);
-          setCallerOptions(names);
-        }
-
-        if (!leadRes.ok) {
-          throw new Error("Patient lead not found");
-        }
-        const data = await leadRes.json();
-        if (data.lead) {
-          applyLeadData(data.lead);
-        }
-      } catch (err: any) {
-        setError(err.message || "Failed to load lead details");
-      } finally {
-        setLoading(false);
+      if (!meRes.ok) {
+        router.push("/agent/login");
+        return;
       }
-    }
+      const meData = await meRes.json();
+      if (!meData.user) {
+        router.push("/agent/login");
+        return;
+      }
+      setUser(meData.user);
 
+      if (cfgRes && cfgRes.ok) {
+        const cfgData = await cfgRes.json();
+        if (cfgData.config?.fields && Array.isArray(cfgData.config.fields)) {
+          setFormFields(cfgData.config.fields);
+        }
+        if (cfgData.config?.subDispositionMappings && Object.keys(cfgData.config.subDispositionMappings).length > 0) {
+          setSubDispositionMappings(cfgData.config.subDispositionMappings);
+        }
+      }
+
+      if (membersRes && membersRes.ok) {
+        const mData = await membersRes.json();
+        const names = (mData.members || []).map((m: any) => m.name).filter(Boolean);
+        setCallerOptions(names);
+      }
+
+      if (!leadRes.ok) {
+        throw new Error("Patient lead not found");
+      }
+      const data = await leadRes.json();
+      if (data.lead) {
+        applyLeadData(data.lead);
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to load lead details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadData();
   }, [leadId, router]);
 
@@ -321,7 +327,6 @@ export default function LeadDetailPage({
     }));
   };
 
-  // Auto-calculate Lead Score based on the 6 clinical/demographic criteria
   useEffect(() => {
     const score = calculateLeadScore({
       husbandAge: formData.husbandAge,
@@ -366,7 +371,6 @@ export default function LeadDetailPage({
   const handleCampLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const camp = e.target.value;
     if (camp === "NA") {
-      // If NA is selected, do not autofill centre location, let user manually choose
       setFormData((prev: any) => ({
         ...prev,
         campLocation: camp,
@@ -437,15 +441,8 @@ export default function LeadDetailPage({
     setFormData((prev: any) => ({ ...prev, [field]: raw }));
   };
 
-  const handleCustomFieldChange = (fieldId: string, value: any) => {
-    setCustomFieldValues((prev) => ({
-      ...prev,
-      [fieldId]: value,
-    }));
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setSaving(true);
     setError("");
 
@@ -480,11 +477,8 @@ export default function LeadDetailPage({
         setNotesHistory(data.lead.notesHistory);
       }
 
-      setFormData((prev: any) => ({
-        ...prev,
-        notes: "",
-      }));
       setToastMessage("Lead details updated successfully!");
+      setIsEditModalOpen(false);
       notifyLeadUpdated();
       setTimeout(() => setToastMessage(""), 4000);
     } catch (err: any) {
@@ -492,6 +486,33 @@ export default function LeadDetailPage({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleAddQuickNote = async (noteText: string) => {
+    const res = await fetch(`/api/agent/leads/${leadId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...formData,
+        notes: noteText,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to submit note");
+    }
+
+    if (data.lead?.auditLogs) {
+      setAuditLogs(data.lead.auditLogs);
+    }
+    if (data.lead?.notesHistory) {
+      setNotesHistory(data.lead.notesHistory);
+    }
+    setFormData((prev: any) => ({ ...prev, notes: noteText }));
+    setToastMessage("Note added successfully!");
+    notifyLeadUpdated();
+    setTimeout(() => setToastMessage(""), 4000);
   };
 
   const handleDelete = async () => {
@@ -517,64 +538,6 @@ export default function LeadDetailPage({
     }
   };
 
-  const renderDynamicSectionFields = (sectionId: 1 | 2 | 3 | 4) => {
-    const customFieldsInSec = formFields.filter(
-      (f) => f.section === sectionId && !f.isSystem && f.enabled !== false
-    );
-    if (customFieldsInSec.length === 0) return null;
-
-    return (
-      <div className="pt-3 border-t border-slate-200 mt-4">
-        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-2">
-          Custom Added Fields
-        </span>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {customFieldsInSec.map((f) => (
-            <div key={f.id} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
-              <label className="block text-xs font-semibold text-black mb-1.5">
-                {f.label} {f.required && <span className="text-rose-600">*</span>}
-              </label>
-
-              {f.type === "select" ? (
-                <select
-                  required={f.required}
-                  value={customFieldValues[f.id] || ""}
-                  onChange={(e) => handleCustomFieldChange(f.id, e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                >
-                  <option value="">Select {f.label}</option>
-                  {(f.options || []).map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-              ) : f.type === "textarea" ? (
-                <textarea
-                  required={f.required}
-                  rows={3}
-                  value={customFieldValues[f.id] || ""}
-                  onChange={(e) => handleCustomFieldChange(f.id, e.target.value)}
-                  placeholder={f.placeholder || ""}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] resize-none"
-                />
-              ) : (
-                <input
-                  required={f.required}
-                  type={f.type || "text"}
-                  value={customFieldValues[f.id] || ""}
-                  onChange={(e) => handleCustomFieldChange(f.id, e.target.value)}
-                  placeholder={f.placeholder || ""}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -589,7 +552,7 @@ export default function LeadDetailPage({
 
       <div className="flex-1 flex flex-col min-w-0 pb-16">
         {/* Top Header */}
-        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 py-3.5 flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-3">
             <Link
               href="/agent/leads"
@@ -599,953 +562,130 @@ export default function LeadDetailPage({
             </Link>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-black">
+                <h1 className="text-base sm:text-lg font-bold text-slate-900">
                   {formData.wifeName || formData.husbandName || "Lead Details"}
                 </h1>
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20 font-mono font-bold">
-                  {formData.uniqueId}
+                  {formData.uniqueId || "N/A"}
                 </span>
               </div>
               <p className="text-xs text-slate-500">
-                Lead ID: <span className="font-mono font-bold text-[#cc2727]">{formData.uniqueId || "N/A"}</span> | Created: {formData.createdOn || "-"}
+                Created: <span className="font-semibold text-slate-700">{formData.createdOn || "-"}</span> | Center: <span className="font-semibold text-slate-700">{formData.centreLocation || "NA"}</span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
+              className="py-1.5 px-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+              <span>Edit Lead</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setIsConfirmDeleteOpen(true)}
-              className="py-2 px-3 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="py-1.5 px-3 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Delete</span>
             </button>
-
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="py-2 px-4 bg-[#cc2727] hover:bg-[#b02121] text-white text-xs font-semibold rounded-xl flex items-center gap-2 shadow-lg shadow-[#cc2727]/20 transition-all active:scale-95 disabled:opacity-50"
-            >
-              {saving ? (
-                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Save className="w-3.5 h-3.5" />
-              )}
-              <span>Save Changes</span>
-            </button>
           </div>
         </header>
 
-        {/* Form Body */}
-        <main className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] w-full mx-auto">
+        {/* LeadSquared Main View Body */}
+        <main className="p-4 sm:p-6 lg:p-7 space-y-5 max-w-[1700px] w-full mx-auto">
           {toastMessage && (
-            <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-3 animate-in fade-in">
-              <CheckCircle className="w-5 h-5 shrink-0" />
-              <span className="text-sm font-medium">{toastMessage}</span>
+            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-3 animate-in fade-in text-xs font-medium">
+              <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
+              <span>{toastMessage}</span>
             </div>
           )}
 
           {error && (
-            <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              <span className="text-sm font-medium">{error}</span>
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-3 text-xs font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{error}</span>
             </div>
           )}
 
-          {/* Patient Overview Summary */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20 flex items-center justify-center font-extrabold text-2xl uppercase shrink-0">
-                {formData.wifeName ? formData.wifeName.charAt(0) : "W"}
+          {/* 2-Column LeadSquared Layout (Screenshot 1, 2, 3 Match) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left 8 Cols: Tabs Header + Active Tab Content */}
+            <div className="lg:col-span-8 space-y-4">
+              <LeadSquaredTabsHeader activeTab={activeTab} onTabChange={setActiveTab} />
+
+              {/* Tab 1: Activity History */}
+              {activeTab === "activity_history" && (
+                <LeadSquaredActivityHistory
+                  auditLogs={auditLogs}
+                  leadData={formData}
+                />
+              )}
+
+              {/* Tab 2: Audit Trail */}
+              {activeTab === "audit_trail" && (
+                <LeadSquaredAuditTrail
+                  auditLogs={auditLogs}
+                  leadUniqueId={formData.uniqueId}
+                />
+              )}
+
+              {/* Tab 3: Lead Details */}
+              {activeTab === "lead_details" && (
+                <LeadSquaredLeadDetails
+                  formData={formData}
+                  onEditClick={() => setIsEditModalOpen(true)}
+                  hideEmptyFields={hideEmptyFields}
+                  onToggleHideEmpty={() => setHideEmptyFields((prev) => !prev)}
+                />
+              )}
+
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold text-black">
-                    {formData.wifeName} {formData.husbandName ? `& ${formData.husbandName}` : ""}
-                  </h2>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono font-bold">
-                    Age: {formData.wifeAge || "-"} / {formData.husbandAge || "-"}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-slate-600">
-                  <span className="font-mono font-semibold text-slate-800">
-                    📞 {formData.primaryMobileNumber || "-"}
-                  </span>
-                  <span>📍 {formData.centreLocation || "Centre Not Assigned"}</span>
-                  <span className="font-semibold text-indigo-700">
-                    ⏱️ Age: {formData.leadAge || "0 days"}
-                  </span>
-                </div>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs px-3 py-1 rounded-lg font-bold bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-                Stage: {formData.leadStage || "Pending"}
-              </span>
-              <span className="text-xs px-3 py-1 rounded-lg font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                Status: {formData.leadValidStatus || "NA"}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left 2 cols: Main Form */}
-            <div className="lg:col-span-2 space-y-6">
-              <form onSubmit={handleSave} className="space-y-6">
-                {/* Section 1: Lead Identification & Overview */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-                  <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#cc2727]" />
-                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
-                      1. Lead Identification & Overview
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Unique ID / Lead ID */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Lead ID
-                      </label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={formData.uniqueId}
-                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-[#cc2727] text-xs font-mono font-bold cursor-not-allowed"
-                      />
-                    </div>
-
-                    {/* First Activity Date */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        First Activity Date
-                      </label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={formData.firstActivityDate ? new Date(formData.firstActivityDate).toLocaleString() : "Auto-filled"}
-                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-black text-xs font-medium cursor-not-allowed"
-                      />
-                    </div>
-
-                    {/* Lead Source / UTM Source */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Lead Source / UTM Source *
-                      </label>
-                      <select
-                        required
-                        name="leadSource"
-                        value={formData.leadSource}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        <option value="">Select Lead Source</option>
-                        {LEAD_SOURCES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Campaign Name */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Campaign Name *
-                      </label>
-                      <select
-                        required
-                        name="campaignName"
-                        value={formData.campaignName}
-                        onChange={handleCampaignNameChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        <option value="">Select Campaign</option>
-                        {CAMPAIGN_NAMES.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Source Name */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Source Name
-                      </label>
-                      <select
-                        name="sourceName"
-                        value={formData.sourceName}
-                        onChange={handleSourceNameChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        <option value="">Select Source Name</option>
-                        {SOURCE_NAMES.map((sn) => (
-                          <option key={sn} value={sn}>
-                            {sn}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Source */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Source *
-                      </label>
-                      <select
-                        required
-                        name="source"
-                        value={formData.source}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        {GENERAL_SOURCES.map((src) => (
-                          <option key={src} value={src}>
-                            {src}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Lead Score */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Lead Score *
-                      </label>
-                      <input
-                        type="text"
-                        readOnly
-                        name="leadScore"
-                        value={formData.leadScore}
-                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-amber-700 font-bold text-xs font-mono cursor-not-allowed"
-                      />
-                    </div>
-
-                    {/* Lead Owner */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Lead Owner *
-                      </label>
-                      <select
-                        name="leadOwner"
-                        value={formData.leadOwner}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        <option value="">Select Lead Owner</option>
-                        {callerOptions.map((name) => (
-                          <option key={name} value={name}>
-                            {name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Lead Age */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Lead Age (Today - Created)
-                      </label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={formData.leadAge}
-                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-black text-xs font-medium cursor-not-allowed"
-                      />
-                    </div>
-                  </div>
-
-                  {renderDynamicSectionFields(1)}
-                </div>
-
-                {/* Section 2: Couple Profile & Medical Details */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-                  <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
-                    <Heart className="w-4 h-4 text-[#cc2727]" />
-                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
-                      2. Couple Profile & Medical Details
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Husband Name */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Husband Name *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        name="husbandName"
-                        value={formData.husbandName}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Wife Name */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Wife Name *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        name="wifeName"
-                        value={formData.wifeName}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Husband Age (2 digits) */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Husband Age (2 Digits) *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        maxLength={2}
-                        value={formData.husbandAge}
-                        onChange={(e) => handleAgeChange(e, "husbandAge")}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Wife Age (2 digits) */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Wife Age (2 Digits) *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        maxLength={2}
-                        value={formData.wifeAge}
-                        onChange={(e) => handleAgeChange(e, "wifeAge")}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* When are you planning to start treatment */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        When are you planning to start treatment
-                      </label>
-                      <select
-                        name="whenPlanningToStartTreatment"
-                        value={formData.whenPlanningToStartTreatment}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        <option value="">Select Timeline</option>
-                        {WHEN_START_TREATMENT_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Pre Medical Conditions (Yes/No) */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Pre Medical Conditions *
-                      </label>
-                      <select
-                        required
-                        name="preMedicalConditions"
-                        value={formData.preMedicalConditions}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-
-                    {/* Married Since (Numbers only) */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Married Since (Years) *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.marriedSince}
-                        onChange={(e) => handleNumberOnlyChange(e, "marriedSince")}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* How long you are trying to conceive */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        How long you are trying to conceive (Years) *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.tryingToConceiveYears}
-                        onChange={(e) => handleNumberOnlyChange(e, "tryingToConceiveYears")}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-                  </div>
-                  {renderDynamicSectionFields(2)}
-                </div>
-
-                {/* Section 3: Contact & Address Information */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-                  <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-[#cc2727]" />
-                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
-                      3. Contact & Address Information
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Primary Mobile Number (Wife) */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Primary Mobile number (Wife) *
-                      </label>
-                      <div className="flex gap-2">
-                        <select
-                          value={primaryCountryCode}
-                          onChange={(e) => setPrimaryCountryCode(e.target.value)}
-                          className="w-28 px-2 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                        >
-                          {COUNTRY_CODES.map((c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="tel"
-                          required
-                          value={primaryRawPhone}
-                          onChange={(e) => setPrimaryRawPhone(e.target.value.replace(/\D/g, ""))}
-                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Secondary Mobile Number */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Secondary Mobile number
-                      </label>
-                      <div className="flex gap-2">
-                        <select
-                          value={secondaryCountryCode}
-                          onChange={(e) => setSecondaryCountryCode(e.target.value)}
-                          className="w-28 px-2 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                        >
-                          {COUNTRY_CODES.map((c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="tel"
-                          value={secondaryRawPhone}
-                          onChange={(e) => setSecondaryRawPhone(e.target.value.replace(/\D/g, ""))}
-                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Whatsapp Mobile Number */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Whatsapp Mobile Number
-                      </label>
-                      <div className="flex gap-2">
-                        <select
-                          value={whatsappCountryCode}
-                          onChange={(e) => setWhatsappCountryCode(e.target.value)}
-                          className="w-28 px-2 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                        >
-                          {COUNTRY_CODES.map((c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="tel"
-                          value={whatsappRawPhone}
-                          onChange={(e) => setWhatsappRawPhone(e.target.value.replace(/\D/g, ""))}
-                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Other Numbers */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Other Numbers
-                      </label>
-                      <div className="flex gap-2">
-                        <select
-                          value={otherCountryCode}
-                          onChange={(e) => setOtherCountryCode(e.target.value)}
-                          className="w-28 px-2 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                        >
-                          {COUNTRY_CODES.map((c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="tel"
-                          value={otherRawPhone}
-                          onChange={(e) => setOtherRawPhone(e.target.value.replace(/\D/g, ""))}
-                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Primary Email */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Primary Email (Pt Email)
-                      </label>
-                      <input
-                        type="email"
-                        name="primaryEmail"
-                        value={formData.primaryEmail}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Secondary Email */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Secondary Email (Spouse)
-                      </label>
-                      <input
-                        type="email"
-                        name="secondaryEmail"
-                        value={formData.secondaryEmail}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Whatsapp Consent */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Whatsapp Consent
-                      </label>
-                      <select
-                        name="whatsappConsent"
-                        value={formData.whatsappConsent}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-
-                    {/* Calling Consent */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Calling Consent
-                      </label>
-                      <select
-                        name="callingConsent"
-                        value={formData.callingConsent}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-
-                    {/* Pt Address */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Pt Address
-                      </label>
-                      <input
-                        type="text"
-                        name="ptAddress"
-                        value={formData.ptAddress}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Pt Pincode */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Pt Pincode
-                      </label>
-                      <input
-                        type="text"
-                        name="ptPincode"
-                        value={formData.ptPincode}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Pt Country */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Pt Country
-                      </label>
-                      <input
-                        type="text"
-                        name="ptCountry"
-                        value={formData.ptCountry}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Pt State */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Pt State
-                      </label>
-                      <input
-                        type="text"
-                        name="ptState"
-                        value={formData.ptState}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Pt City */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Pt City
-                      </label>
-                      <input
-                        type="text"
-                        name="ptCity"
-                        value={formData.ptCity}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-                  </div>
-                  {renderDynamicSectionFields(3)}
-                </div>
-
-                {/* Section 4: Disposition, Centre, Visits & Registration */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-                  <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
-                    <Building className="w-4 h-4 text-[#cc2727]" />
-                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
-                      4. Disposition, Centre, Visits & Registration
-                    </h3>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Sub Status */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Sub Status *
-                      </label>
-                      <select
-                        required
-                        name="subStatus"
-                        value={formData.subStatus}
-                        onChange={handleSubStatusChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] font-semibold"
-                      >
-                        <option value="">Select Sub Status</option>
-                        {Object.keys(SUB_DISPOSITIONS_MAP).map((sub) => (
-                          <option key={sub} value={sub}>
-                            {sub}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Lead Stage (Autofilled) */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Lead Stage (Autofilled)
-                      </label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={formData.leadStage}
-                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-[#cc2727] font-bold text-xs cursor-not-allowed"
-                      />
-                    </div>
-
-                    {/* Lead Valid Status (Autofilled) */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Lead Valid Status (Autofilled)
-                      </label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={formData.leadValidStatus}
-                        className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-300 rounded-xl text-slate-800 font-bold text-xs cursor-not-allowed"
-                      />
-                    </div>
-
-                    {/* Camp Location */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Camp Location (Optional)
-                      </label>
-                      <select
-                        name="campLocation"
-                        value={formData.campLocation}
-                        onChange={handleCampLocationChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        <option value="">Select Camp Location</option>
-                        {CAMP_LOCATIONS.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Centre Location */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Centre Location *
-                      </label>
-                      <select
-                        required
-                        name="centreLocation"
-                        value={formData.centreLocation}
-                        onChange={handleCentreLocationChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] font-semibold"
-                      >
-                        <option value="">Select Centre</option>
-                        {CENTRE_LOCATIONS.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Centre Address */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Centre Address *
-                      </label>
-                      <input
-                        type="text"
-                        name="centreAddress"
-                        value={formData.centreAddress}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Follow Up Date and Time */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Follow Up Date and Time
-                      </label>
-                      <input
-                        type="datetime-local"
-                        name="followUpDateTime"
-                        value={formData.followUpDateTime}
-                        onChange={handleChange}
-                        disabled={formData.leadStage === "Converted" || formData.leadStage === "Closed"}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] disabled:bg-slate-100 disabled:cursor-not-allowed"
-                      />
-                    </div>
-
-                    {/* Appointment Date */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Appointment Date
-                      </label>
-                      <input
-                        type="date"
-                        name="appointmentDate"
-                        value={formData.appointmentDate}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Centre Visited Date */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Centre Visited Date {(formData.subStatus === "Visited Centre" || formData.subStatus === "Visited at Centre") && <span className="text-rose-600">*</span>}
-                      </label>
-                      <input
-                        type="date"
-                        name="centreVisitedDate"
-                        required={(formData.subStatus === "Visited Centre" || formData.subStatus === "Visited at Centre")}
-                        value={formData.centreVisitedDate}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Camp Visited Date */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Camp Visited Date {(formData.subStatus === "Visited Camp" || formData.subStatus === "Visited at Camp") && <span className="text-rose-600">*</span>}
-                      </label>
-                      <input
-                        type="date"
-                        name="campVisitedDate"
-                        required={(formData.subStatus === "Visited Camp" || formData.subStatus === "Visited at Camp")}
-                        value={formData.campVisitedDate}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Registration Status */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Registration Status
-                      </label>
-                      <select
-                        name="registrationStatus"
-                        value={formData.registrationStatus}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      >
-                        <option value="No">No</option>
-                        <option value="Yes">Yes</option>
-                      </select>
-                    </div>
-
-                    {/* Registration Number */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Registration Number
-                      </label>
-                      <input
-                        type="text"
-                        name="registrationNumber"
-                        value={formData.registrationNumber}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Registration Amount */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Registration Amount
-                      </label>
-                      <input
-                        type="text"
-                        name="registrationAmount"
-                        value={formData.registrationAmount}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Package */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Package
-                      </label>
-                      <input
-                        type="text"
-                        name="package"
-                        value={formData.package}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-
-                    {/* Plan */}
-                    <div>
-                      <label className="block text-xs font-semibold text-black mb-1.5">
-                        Plan
-                      </label>
-                      <input
-                        type="text"
-                        name="plan"
-                        value={formData.plan}
-                        onChange={handleChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
-                      />
-                    </div>
-                  </div>
-                  {renderDynamicSectionFields(4)}
-                </div>
-
-                {/* Section 5: Notes & Observations */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-                  <div className="border-b border-slate-200 pb-3 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-[#cc2727]" />
-                    <h3 className="text-sm font-bold text-black uppercase tracking-wider">
-                      5. Notes & Observations *
-                    </h3>
-                  </div>
-                  <div>
-                    <textarea
-                      name="notes"
-                      rows={4}
-                      value={formData.notes}
-                      onChange={handleChange}
-                      placeholder="Add new patient remarks, call observations or internal notes..."
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs focus:outline-none focus:ring-2 focus:ring-[#cc2727] resize-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Bottom Save Bar */}
-                <div className="flex items-center justify-between p-4 bg-white/90 border border-slate-200 rounded-2xl sticky bottom-4 z-20 backdrop-blur-md shadow-sm">
-                  <span className="text-xs text-gray-500">
-                    Modified: <span className="font-mono text-black font-semibold">{formData.modifiedOn || "Not modified yet"}</span>
-                  </span>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="py-2.5 px-6 bg-[#cc2727] hover:bg-[#b02121] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-[#cc2727]/25 transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    {saving ? (
-                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <Save className="w-3.5 h-3.5" />
-                    )}
-                    <span>Save Changes</span>
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Right 1 col: Notes History & Audit Logs */}
-            <div className="space-y-6">
-              <NotesHistory notesHistory={notesHistory} />
-              <LeadAuditHistory auditLogs={auditLogs} />
+            {/* Right 4 Cols: LeadSquared Notes Stream (Exact match to Screenshot Right Panel) */}
+            <div className="lg:col-span-4 sticky top-20">
+              <LeadSquaredNotes
+                notesHistory={notesHistory}
+                currentNotes={formData.notes}
+                onAddNoteClick={() => setIsAddNoteModalOpen(true)}
+                leadUniqueId={formData.uniqueId}
+              />
             </div>
           </div>
         </main>
         <Footer />
       </div>
+
+      {/* Quick Add Note Modal */}
+      <AddNoteModal
+        isOpen={isAddNoteModalOpen}
+        onClose={() => setIsAddNoteModalOpen(false)}
+        onSubmit={handleAddQuickNote}
+        patientName={formData.wifeName || formData.husbandName}
+        leadUniqueId={formData.uniqueId}
+      />
+
+      {/* Edit Full Lead Modal */}
+      <EditLeadModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        formData={formData}
+        handleChange={handleChange}
+        handleCampaignNameChange={handleCampaignNameChange}
+        handleSourceNameChange={handleSourceNameChange}
+        handleCampLocationChange={handleCampLocationChange}
+        handleCentreLocationChange={handleCentreLocationChange}
+        handleSubStatusChange={handleSubStatusChange}
+        handleAgeChange={handleAgeChange}
+        handleNumberOnlyChange={handleNumberOnlyChange}
+        handleSave={handleSave}
+        saving={saving}
+        callerOptions={callerOptions}
+      />
 
       {/* Delete Confirmation Modal */}
       {isConfirmDeleteOpen && (
@@ -1566,7 +706,7 @@ export default function LeadDetailPage({
               <button
                 type="button"
                 onClick={() => setIsConfirmDeleteOpen(false)}
-                className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-black text-xs font-semibold rounded-xl transition-colors"
+                className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-black text-xs font-semibold rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -1574,7 +714,7 @@ export default function LeadDetailPage({
                 type="button"
                 disabled={deleting}
                 onClick={handleDelete}
-                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-rose-600/20"
+                className="flex-1 py-2.5 px-4 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-lg shadow-rose-600/20 cursor-pointer"
               >
                 {deleting ? (
                   <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
