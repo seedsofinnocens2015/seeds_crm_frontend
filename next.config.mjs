@@ -44,13 +44,21 @@ const nextConfig = {
           destination: `${backendUrl}/api/v1/leads/merge`,
         },
 
-        // 4. Lead CRUD endpoints
+        // 4. Lead CRUD endpoints (Admin, Agent, Marketing, MIS, Team Leader)
         {
           source: "/api/admin/leads",
           destination: `${backendUrl}/api/v1/leads`,
         },
         {
           source: "/api/admin/leads/:id",
+          destination: `${backendUrl}/api/v1/leads/:id`,
+        },
+        {
+          source: "/api/:role(agent|marketing|mis|team-leader)/leads",
+          destination: `${backendUrl}/api/v1/leads`,
+        },
+        {
+          source: "/api/:role(agent|marketing|mis|team-leader)/leads/:id",
           destination: `${backendUrl}/api/v1/leads/:id`,
         },
 

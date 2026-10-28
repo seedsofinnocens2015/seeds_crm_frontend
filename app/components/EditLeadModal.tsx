@@ -407,7 +407,7 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Lead Owner / Caller *
+                    Lead Owner / Caller
                   </label>
                   <select
                     name="leadOwner"
@@ -415,7 +415,7 @@ export default function EditLeadModal({
                     onChange={handleChange}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                   >
-                    <option value="">Select Owner</option>
+                    <option value="">Select Owner (Optional)</option>
                     {callerOptions.map((c) => (
                       <option key={c} value={c}>
                         {c}

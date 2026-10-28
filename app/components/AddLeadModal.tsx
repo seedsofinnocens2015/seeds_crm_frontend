@@ -233,14 +233,23 @@ export default function AddLeadModal({
           if (res.ok) {
             const data = await res.json();
             const names = (data.members || []).map((m: any) => m.name).filter(Boolean);
+            if (defaultCallerName && !names.includes(defaultCallerName)) {
+              names.unshift(defaultCallerName);
+            }
             setCallerOptions(names);
+          } else if (defaultCallerName) {
+            setCallerOptions([defaultCallerName]);
           }
-        } catch {}
+        } catch {
+          if (defaultCallerName) {
+            setCallerOptions([defaultCallerName]);
+          }
+        }
       };
 
       fetchConfigAndCallers();
     }
-  }, [isOpen, suggestedUniqueId, defaultCallerName]);
+  }, [isOpen]);
 
   // Auto-calculate Lead Score based on the 6 clinical/demographic criteria
   useEffect(() => {
@@ -625,7 +634,7 @@ export default function AddLeadModal({
               {/* Lead Owner */}
               <div>
                 <label className="block text-xs font-bold text-black mb-1.5">
-                  Lead Owner <span className="text-[#cc2727]">*</span>
+                  Lead Owner
                 </label>
                 <select
                   name="leadOwner"
@@ -633,7 +642,7 @@ export default function AddLeadModal({
                   onChange={handleChange}
                   className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#cc2727]"
                 >
-                  <option value="">Select Lead Owner</option>
+                  <option value="">Select Lead Owner (Optional)</option>
                   {callerOptions.map((name) => (
                     <option key={name} value={name}>
                       {name}

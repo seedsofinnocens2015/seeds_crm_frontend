@@ -50,6 +50,7 @@ import {
   getCachedLeads,
   setCachedLeads,
   setCachedLeadDetail,
+  invalidateLeadsCache,
 } from "@/lib/leadsCache";
 
 interface ColumnConfig {
@@ -341,14 +342,14 @@ export default function AgentLeadsPage() {
 
     // 2. Real-time background safety sync (every 60 seconds) from MongoDB
     const interval = setInterval(() => {
-      if (typeof document !== "undefined" && !document.hidden) {
+      if (typeof document !== "undefined" && !document.hidden && !isModalOpen) {
         fetchSessionAndLeads(true);
       }
     }, 60000);
 
     // 3. Instant refresh on tab focus / visibility change
     const handleVisibilityOrFocus = () => {
-      if (typeof document !== "undefined" && !document.hidden) {
+      if (typeof document !== "undefined" && !document.hidden && !isModalOpen) {
         fetchSessionAndLeads(true);
       }
     };
@@ -368,6 +369,7 @@ export default function AgentLeadsPage() {
       fetchSessionAndLeads(true);
     };
     window.addEventListener("lead_updated", handleCustomLeadUpdate);
+    window.addEventListener("crm:leadUpdated", handleCustomLeadUpdate);
 
     return () => {
       clearInterval(interval);
@@ -375,8 +377,9 @@ export default function AgentLeadsPage() {
       document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("lead_updated", handleCustomLeadUpdate);
+      window.removeEventListener("crm:leadUpdated", handleCustomLeadUpdate);
     };
-  }, []);
+  }, [isModalOpen]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -384,7 +387,10 @@ export default function AgentLeadsPage() {
   };
 
   const handleLeadAdded = (newLead: any) => {
+    invalidateLeadsCache("agent");
     setLeads((prev) => [newLead, ...prev]);
+    setFilters(initialFilters);
+    try { localStorage.removeItem("crm_leads_filters_agent"); } catch (e) {}
     notifyLeadUpdated();
     // Compute next ID
     const match = newLead.uniqueId?.match(/^(?:SOI|SC)-(\d+)$/i);

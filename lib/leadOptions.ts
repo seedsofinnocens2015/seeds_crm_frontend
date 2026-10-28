@@ -2042,6 +2042,10 @@ export function calculateLeadAge(createdDateOrStr: string | Date | undefined | n
 export function notifyLeadUpdated() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("crm:leadUpdated"));
+    window.dispatchEvent(new CustomEvent("lead_updated"));
+    try {
+      localStorage.setItem("surgical_crm_leads_updated", Date.now().toString());
+    } catch {}
   }
 }
 
