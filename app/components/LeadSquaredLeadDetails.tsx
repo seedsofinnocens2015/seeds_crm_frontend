@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import ClickToCallButton from "./ClickToCallButton";
 import {
   Edit3,
   ChevronDown,
@@ -144,7 +145,23 @@ export default function LeadSquaredLeadDetails({
 
         {openSections.contact && (
           <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-4 gap-x-6 text-xs">
-            {renderField("Primary Mobile number", formData.primaryMobileNumber)}
+            <div>
+              <span className="block text-[11px] font-semibold text-slate-400 mb-0.5">
+                Primary Mobile number
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-900 text-xs font-mono">
+                  {formData.primaryMobileNumber || "-"}
+                </span>
+                {formData.primaryMobileNumber && (
+                  <ClickToCallButton
+                    leadId={formData.uniqueId || formData._id}
+                    phoneDisplay={formData.primaryMobileNumber}
+                    variant="table-icon"
+                  />
+                )}
+              </div>
+            </div>
             {renderField("Secondary Mobile number", formData.secondaryMobileNumber)}
             {renderField("Whatsapp Mobile Number", formData.whatsappMobileNumber)}
             {renderField("Other Numbers", formData.otherNumbers)}

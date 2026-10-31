@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Hash } from "lucide-react";
+import ClickToCallButton from "./ClickToCallButton";
 
 interface LeadTableCellProps {
   colId: string;
@@ -9,7 +10,7 @@ interface LeadTableCellProps {
   leadId: string;
 }
 
-export function renderLeadTableCell({ colId, lead }: LeadTableCellProps) {
+export function renderLeadTableCell({ colId, lead, leadId }: LeadTableCellProps) {
   switch (colId) {
     case "firstActivityDate":
       return (
@@ -99,7 +100,11 @@ export function renderLeadTableCell({ colId, lead }: LeadTableCellProps) {
     case "primaryMobileNumber":
       return (
         <td key={colId} className="px-4 py-3.5 font-mono text-black font-semibold">
-          {lead.primaryMobileNumber || lead.mobileNumber || "-"}
+          <ClickToCallButton
+            leadId={lead.uniqueId || lead._id || leadId}
+            phoneDisplay={lead.primaryMobileNumber || lead.mobileNumber || "-"}
+            variant="table-icon"
+          />
         </td>
       );
 

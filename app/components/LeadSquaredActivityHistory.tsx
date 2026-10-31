@@ -74,34 +74,29 @@ function formatGroupDate(dateStr: string) {
     if (isNaN(d.getTime())) return "Recent";
     const now = new Date();
 
-    const isToday =
-      d.getDate() === now.getDate() &&
-      d.getMonth() === now.getMonth() &&
-      d.getFullYear() === now.getFullYear();
+    const getIstKey = (date: Date) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(date);
 
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday =
-      d.getDate() === yesterday.getDate() &&
-      d.getMonth() === yesterday.getMonth() &&
-      d.getFullYear() === yesterday.getFullYear();
+    const dateKey = getIstKey(d);
+    const todayKey = getIstKey(now);
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayKey = getIstKey(yesterday);
 
-    const monthNames = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-    ];
+    const formatter = new Intl.DateTimeFormat("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
 
-    if (isToday) {
-      return `Today, ${d.getDate()} ${monthNames[d.getMonth()]}, ${d.getFullYear()}`;
+    if (dateKey === todayKey) {
+      return `Today, ${formatter.format(d)}`;
     }
-    if (isYesterday) {
-      return `Yesterday, ${d.getDate()} ${monthNames[d.getMonth()]}, ${d.getFullYear()}`;
+    if (dateKey === yesterdayKey) {
+      return `Yesterday, ${formatter.format(d)}`;
     }
 
-    if (d.getFullYear() === now.getFullYear()) {
-      return `${d.getDate()} ${monthNames[d.getMonth()]}, ${d.getFullYear()}`;
-    }
-    return `${monthNames[d.getMonth()]}, ${d.getFullYear()}`;
+    return formatter.format(d);
   } catch {
     return "Recent";
   }
@@ -113,7 +108,8 @@ function formatRelativeTime(dateStr: string) {
     if (isNaN(d.getTime())) return dateStr;
     const now = new Date();
     const diffMs = now.getTime() - d.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMs < 0 && diffMs > -60000) return "Just now"; // Small clock drift guard
+    const diffMins = Math.floor(Math.max(0, diffMs) / 60000);
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
@@ -124,6 +120,7 @@ function formatRelativeTime(dateStr: string) {
     if (diffDays < 30) return `${diffDays} days ago`;
 
     return d.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -138,6 +135,7 @@ function formatExactTime(dateStr: string) {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return "";
     return d.toLocaleTimeString("en-US", {
+      timeZone: "Asia/Kolkata",
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,
@@ -145,6 +143,45 @@ function formatExactTime(dateStr: string) {
   } catch {
     return "";
   }
+}
+
+/**
+ * Safely resolves 'performedBy' / 'addedBy' value to a readable string.
+ * Never outputs [object Object] or unparsed JSON representations.
+ */
+function resolvePerformedBy(val: any, fallback = "Agent"): string {
+  if (val === null || val === undefined) return fallback;
+
+  // If already an object (e.g. populated Mongoose user or object)
+  if (typeof val === "object") {
+    const candidate = val.name || val.fullName || val.displayName || val.email || val.username;
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate.trim();
+    }
+    return fallback;
+  }
+
+  const str = String(val).trim();
+  if (!str || str === "[object Object]") {
+    return fallback;
+  }
+
+  // If stringified JSON e.g. '{"name":"Amit Kumar"}'
+  if (str.startsWith("{") && str.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(str);
+      if (parsed && typeof parsed === "object") {
+        const candidate = parsed.name || parsed.fullName || parsed.displayName || parsed.email;
+        if (typeof candidate === "string" && candidate.trim()) {
+          return candidate.trim();
+        }
+      }
+    } catch {
+      // ignore JSON parse error
+    }
+  }
+
+  return str;
 }
 
 export default function LeadSquaredActivityHistory({
@@ -190,7 +227,7 @@ export default function LeadSquaredActivityHistory({
           id: `stage-${logIdx}`,
           type: "stage_change",
           title: `Stage changed from ${stageChange.oldValue || "Fresh Lead"} to ${stageChange.newValue}`,
-          performedBy: log.performedBy || "Agent",
+          performedBy: resolvePerformedBy(log.performedBy, "Agent"),
           timestamp: log.timestamp,
         });
       }
@@ -207,33 +244,46 @@ export default function LeadSquaredActivityHistory({
           id: `audit-${logIdx}`,
           type: "audit",
           title: `Lead Updated: ${changeDesc.slice(0, 120)}${changeDesc.length > 120 ? "..." : ""}`,
-          performedBy: log.performedBy || "Agent",
+          performedBy: resolvePerformedBy(log.performedBy, "Agent"),
           timestamp: log.timestamp,
         });
       }
     });
 
     // 2. Add Smartflo Call activities
+    const leadDisplayName =
+      (leadData?.wifeName || leadData?.husbandName || leadData?.patientName || "").trim() ||
+      "Unknown Caller";
+
     calls.forEach((c) => {
       const dur = c.answeredDurationSeconds > 0
         ? `${Math.floor(c.answeredDurationSeconds / 60)}m ${c.answeredDurationSeconds % 60}s (Answered)`
         : `${c.durationSeconds}s`;
 
-      const directionText = (c.direction || "Outbound").toUpperCase();
+      const safeDirection =
+        c.direction && c.direction.toLowerCase() !== "unknown"
+          ? c.direction
+          : "Outbound";
+      const directionText = safeDirection.toUpperCase();
       const statusText = (c.status || "Completed").toUpperCase();
+
+      const subtitleParts: string[] = [];
+      if (leadDisplayName) subtitleParts.push(`Lead: ${leadDisplayName}`);
+      if (c.customerNumber) subtitleParts.push(`Phone: ${c.customerNumber}`);
+      if (c.disposition) subtitleParts.push(`Disposition: ${c.disposition}`);
 
       list.push({
         id: `call-${c.callId || c.id}`,
         type: "call",
         title: `${directionText} Call - ${statusText} (${dur})`,
-        subtitle: c.disposition ? `Disposition: ${c.disposition}` : undefined,
-        performedBy: c.agentName || "Smartflo Agent",
+        subtitle: subtitleParts.length > 0 ? subtitleParts.join(" • ") : undefined,
+        performedBy: resolvePerformedBy(c.agentName, "Smartflo Agent"),
         timestamp: c.startTime || new Date().toISOString(),
         recordingUrl: c.recordingAvailable ? c.playbackUrl : null,
         playbackUrl: c.playbackUrl,
         duration: c.answeredDurationSeconds || c.durationSeconds,
         callStatus: c.status,
-        direction: c.direction,
+        direction: safeDirection,
       });
     });
 
@@ -419,7 +469,7 @@ export default function LeadSquaredActivityHistory({
 
                     {/* Footer Info: Added by User | Time | Relative */}
                     <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-400 pt-1">
-                      <span>Added by <strong className="font-semibold text-slate-600">{act.performedBy}</strong></span>
+                      <span>Added by <strong className="font-semibold text-slate-600">{resolvePerformedBy(act.performedBy, "Agent")}</strong></span>
                       <span>|</span>
                       <span>{formatExactTime(act.timestamp)}</span>
                       <span>|</span>

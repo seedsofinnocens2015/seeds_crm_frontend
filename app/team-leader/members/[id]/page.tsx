@@ -85,6 +85,8 @@ function getTodayISODate(): string {
     role: "agent",
     status: "active",
     password: "",
+    smartfloAgentNumber: "",
+    smartfloCallerId: "",
     createdAt: "",
   });
 
@@ -135,6 +137,8 @@ function getTodayISODate(): string {
             role: "agent",
             status: m.status || "active",
             password: "",
+            smartfloAgentNumber: m.smartfloAgentNumber || m.smartfloAgentId || "",
+            smartfloCallerId: m.smartfloCallerId || "",
             createdAt: m.createdAt || "",
           });
         }
@@ -436,6 +440,8 @@ function getTodayISODate(): string {
         email: formData.email.trim(),
         role: "agent", // locked to agent
         status: formData.status,
+        smartfloAgentNumber: formData.smartfloAgentNumber.trim(),
+        smartfloCallerId: formData.smartfloCallerId.trim(),
       };
 
       if (formData.password.trim()) {
@@ -591,6 +597,12 @@ function getTodayISODate(): string {
                     <Phone className="w-3.5 h-3.5 text-gray-500" />
                     {formData.mobile || "No mobile"}
                   </span>
+                  {formData.smartfloAgentNumber && (
+                    <span className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200 font-mono text-[11px]">
+                      <PhoneCall className="w-3 h-3 text-emerald-600" />
+                      Smartflo: {formData.smartfloAgentNumber}
+                    </span>
+                  )}
                   {formData.createdAt && (
                     <span className="flex items-center gap-1.5 text-gray-600">
                       <Clock className="w-3.5 h-3.5 text-gray-500" />
@@ -1149,6 +1161,38 @@ function getTodayISODate(): string {
                     value={formData.mobile}
                     onChange={handlePhoneChange}
                     placeholder="e.g. 9876543210"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727] focus:border-[#cc2727]"
+                  />
+                </div>
+
+                {/* Smartflo Agent ID / Extension */}
+                <div>
+                  <label className="block text-xs font-semibold text-black mb-1.5 flex items-center justify-between">
+                    <span>Smartflo Agent ID / Extension</span>
+                    <span className="text-[11px] text-gray-500 font-normal">Optional</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="smartfloAgentNumber"
+                    value={formData.smartfloAgentNumber}
+                    onChange={handleChange}
+                    placeholder="e.g. 06012345 or agent mobile"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727] focus:border-[#cc2727]"
+                  />
+                </div>
+
+                {/* Smartflo Assigned Caller ID / DID */}
+                <div>
+                  <label className="block text-xs font-semibold text-black mb-1.5 flex items-center justify-between">
+                    <span>Smartflo Caller ID / DID</span>
+                    <span className="text-[11px] text-gray-500 font-normal">Optional</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="smartfloCallerId"
+                    value={formData.smartfloCallerId}
+                    onChange={handleChange}
+                    placeholder="e.g. +919228173971"
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-black text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#cc2727] focus:border-[#cc2727]"
                   />
                 </div>

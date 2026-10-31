@@ -31,6 +31,7 @@ import LeadSquaredLeadDetails from "@/app/components/LeadSquaredLeadDetails";
 import LeadSquaredNotes from "@/app/components/LeadSquaredNotes";
 import EditLeadModal from "@/app/components/EditLeadModal";
 import AddNoteModal from "@/app/components/AddNoteModal";
+import ClickToCallButton from "@/app/components/ClickToCallButton";
 import {
   CENTRE_LOCATIONS,
   CAMP_LOCATIONS,
@@ -576,6 +577,13 @@ export default function LeadDetailPage({
           </div>
 
           <div className="flex items-center gap-2">
+            <ClickToCallButton
+              leadId={formData.uniqueId || leadId}
+              variant="header-action"
+              onSuccess={(msg) => setToastMessage(msg)}
+              onError={(err) => setError(err)}
+            />
+
             <button
               type="button"
               onClick={() => setIsEditModalOpen(true)}

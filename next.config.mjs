@@ -2,7 +2,9 @@
 const nextConfig = {
   async rewrites() {
     // Read backend URL from environment variables, fallback to localhost for development
-    const backendUrl = process.env.BACKEND_API_URL || "http://localhost:5000";
+    // Trim trailing slashes to prevent malformed double-slash URLs like https://crmbackend.seedsofinnocens.com//api/v1/...
+    const rawBackendUrl = process.env.BACKEND_API_URL;
+    const backendUrl = rawBackendUrl.replace(/\/+$/, "");
 
     return {
       beforeFiles: [
@@ -82,6 +84,12 @@ const nextConfig = {
         {
           source: "/api/integrations/:path*",
           destination: `${backendUrl}/api/v1/integrations/:path*`,
+        },
+
+        // 8. WebSocket proxy endpoint for Socket.IO telephony events
+        {
+          source: "/socket.io/:path*",
+          destination: `${backendUrl}/socket.io/:path*`,
         },
       ],
       afterFiles: [],

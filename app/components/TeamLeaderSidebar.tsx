@@ -20,6 +20,7 @@ import {
   UserCheck,
   FileEdit,
 } from "lucide-react";
+import UserProfileModal from "./UserProfileModal";
 
 interface TeamLeaderSidebarProps {
   activeTab?: string;
@@ -120,102 +121,12 @@ export default function TeamLeaderSidebar({ user, onLogout }: TeamLeaderSidebarP
       </aside>
 
       {/* Profile Details Modal */}
-      {isProfileModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 sm:p-7 text-slate-900">
-            {/* Close Button */}
-            <button
-              onClick={() => setIsProfileModalOpen(false)}
-              className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* Profile Header */}
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 rounded-2xl bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20 flex items-center justify-center font-extrabold text-2xl uppercase shadow-md shadow-[#cc2727]/10 shrink-0">
-                {user?.name ? user.name.charAt(0) : "T"}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-bold text-slate-900 leading-tight">
-                  {user?.name || "Team Leader"}
-                </h3>
-                <span className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20">
-                  <Shield className="w-3 h-3" />
-                  Team Leader
-                </span>
-              </div>
-            </div>
-
-            {/* Profile Details List */}
-            <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 text-xs sm:text-sm">
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-200">
-                <span className="text-slate-500 flex items-center gap-2 shrink-0">
-                  <UserCheck className="w-4 h-4 text-[#cc2727]" />
-                  Full Name
-                </span>
-                <span className="font-bold text-slate-900 text-right ml-4">
-                  {user?.name || "N/A"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-200">
-                <span className="text-slate-500 flex items-center gap-2 shrink-0">
-                  <Mail className="w-4 h-4 text-[#cc2727]" />
-                  Email
-                </span>
-                <span className="font-semibold text-slate-800 text-right ml-4 break-all select-all">
-                  {user?.email || "N/A"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-200">
-                <span className="text-slate-500 flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-[#cc2727]" />
-                  Mobile
-                </span>
-                <span className="font-semibold text-slate-800 text-right">
-                  {user?.mobile || "Not specified"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between py-1.5 border-b border-slate-200">
-                <span className="text-slate-500 flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-[#cc2727]" />
-                  Role
-                </span>
-                <span className="font-bold text-[#cc2727] uppercase tracking-wider text-[11px]">
-                  {user?.role || "team_leader"}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between py-1.5">
-                <span className="text-slate-500 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-[#cc2727]" />
-                  Member Since
-                </span>
-                <span className="font-semibold text-slate-800 text-right">
-                  {user?.createdAt
-                    ? new Date(user.createdAt).toLocaleDateString()
-                    : "Active"}
-                </span>
-              </div>
-            </div>
-
-            {/* Sign Out Button inside Popup */}
-            <button
-              onClick={() => {
-                setIsProfileModalOpen(false);
-                onLogout();
-              }}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-[#cc2727] hover:bg-[#b02121] text-white font-semibold rounded-xl text-sm transition-all shadow-md shadow-[#cc2727]/25 active:scale-95 cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Sign Out</span>
-            </button>
-          </div>
-        </div>
-      )}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        user={user}
+        onLogout={onLogout}
+      />
     </>
   );
 }

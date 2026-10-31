@@ -15,6 +15,7 @@ import {
   Megaphone,
   Share2,
 } from "lucide-react";
+import UserProfileModal from "./UserProfileModal";
 
 interface MarketingSidebarProps {
   activeTab?: string;
@@ -131,53 +132,12 @@ export default function MarketingSidebar({ user, onLogout }: MarketingSidebarPro
       </aside>
 
       {/* User Profile Modal */}
-      {isProfileModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-sm bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 text-black">
-            <button
-              onClick={() => setIsProfileModalOpen(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-black transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex flex-col items-center text-center pb-4 border-b border-slate-200">
-              <div className="w-16 h-16 rounded-2xl bg-violet-50 border border-violet-200 text-violet-700 flex items-center justify-center font-extrabold text-2xl shadow-sm mb-3">
-                {user?.name ? user.name.charAt(0).toUpperCase() : "M"}
-              </div>
-              <h3 className="text-base font-bold text-black">{user?.name || "Marketing Member"}</h3>
-              <span className="mt-1 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200">
-                <Megaphone className="w-3.5 h-3.5 text-violet-600" />
-                Marketing Executive
-              </span>
-            </div>
-
-            <div className="py-4 space-y-3 text-xs">
-              <div className="flex items-center gap-3 text-slate-700">
-                <Mail className="w-4 h-4 text-gray-400 shrink-0" />
-                <span className="truncate">{user?.email || "No email"}</span>
-              </div>
-              <div className="flex items-center gap-3 text-slate-700">
-                <Phone className="w-4 h-4 text-gray-400 shrink-0" />
-                <span>{user?.mobile || "No mobile"}</span>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <button
-                onClick={() => {
-                  setIsProfileModalOpen(false);
-                  onLogout();
-                }}
-                className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Log Out of Portal</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        user={user}
+        onLogout={onLogout}
+      />
     </>
   );
 }

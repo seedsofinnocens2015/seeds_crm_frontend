@@ -22,6 +22,8 @@ export default function AddMemberModal({
     email: "",
     password: "",
     role: (allowedRole || "agent") as "team_leader" | "agent" | "mis" | "marketing",
+    smartfloAgentNumber: "",
+    smartfloCallerId: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -54,6 +56,8 @@ export default function AddMemberModal({
         email: "",
         password: "",
         role: "agent",
+        smartfloAgentNumber: "",
+        smartfloCallerId: "",
       });
       onClose();
     } catch (err: any) {
@@ -268,6 +272,42 @@ export default function AddMemberModal({
                 </label>
               </div>
             )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-black mb-1.5">
+              Smartflo Agent ID / Extension (Optional)
+            </label>
+            <input
+              type="text"
+              value={formData.smartfloAgentNumber}
+              onChange={(e) =>
+                setFormData({ ...formData, smartfloAgentNumber: e.target.value })
+              }
+              placeholder="e.g. 06012345 or Smartflo agent mobile"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#cc2727]/20 focus:border-[#cc2727] text-sm"
+            />
+            <p className="text-[10px] text-gray-500 mt-1">
+              Used to initiate Click-to-Call to this agent's softphone/extension.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-black mb-1.5">
+              Smartflo Outbound Caller ID / DID (Optional)
+            </label>
+            <input
+              type="text"
+              value={formData.smartfloCallerId}
+              onChange={(e) =>
+                setFormData({ ...formData, smartfloCallerId: e.target.value })
+              }
+              placeholder="e.g. +919228173971"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-black placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#cc2727]/20 focus:border-[#cc2727] text-sm"
+            />
+            <p className="text-[10px] text-gray-500 mt-1">
+              Outbound CLI/DID number assigned to this member in Smartflo.
+            </p>
           </div>
 
           <div className="flex gap-3 pt-3">

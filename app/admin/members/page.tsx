@@ -9,6 +9,7 @@ import {
   User,
   Mail,
   Phone,
+  PhoneCall,
   Calendar,
   CheckCircle,
   Sparkles,
@@ -338,6 +339,9 @@ export default function AdminMembersPage() {
                         Mobile Number
                       </th>
                       <th scope="col" className="px-6 py-3.5 font-bold">
+                        Smartflo Telephony
+                      </th>
+                      <th scope="col" className="px-6 py-3.5 font-bold">
                         Joined Date
                       </th>
                       <th scope="col" className="px-6 py-3.5 font-bold text-right">
@@ -405,6 +409,22 @@ export default function AdminMembersPage() {
                           <div className="flex items-center gap-1.5 text-xs text-black font-mono font-medium">
                             <Phone className="w-3.5 h-3.5 text-gray-500" />
                             {member.mobile || "N/A"}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                              <span className="text-gray-500 font-sans font-medium text-[10px]">Ext:</span>
+                              <span className="font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                {member.smartfloAgentNumber || member.smartfloAgentId || "Not set"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                              <span className="text-gray-500 font-sans font-medium text-[10px]">DID:</span>
+                              <span className="font-semibold text-[#cc2727] bg-[#cc2727]/10 px-1.5 py-0.5 rounded border border-[#cc2727]/20">
+                                {member.smartfloCallerId || "Not set"}
+                              </span>
+                            </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-xs text-gray-600">

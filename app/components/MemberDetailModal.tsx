@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import {
@@ -44,6 +44,8 @@ export default function MemberDetailModal({
     role: "agent",
     status: "active",
     password: "",
+    smartfloAgentNumber: "",
+    smartfloCallerId: "",
   });
 
   useEffect(() => {
@@ -55,6 +57,8 @@ export default function MemberDetailModal({
         role: member.role || "agent",
         status: member.status || "active",
         password: "",
+        smartfloAgentNumber: member.smartfloAgentNumber || member.smartfloAgentId || "",
+        smartfloCallerId: member.smartfloCallerId || "",
       });
       setIsEditing(false);
       setIsDeleting(false);
@@ -368,6 +372,42 @@ export default function MemberDetailModal({
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-black mb-1">
+                Smartflo Agent ID / Extension
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 06012345 or agent mobile"
+                value={editForm.smartfloAgentNumber}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, smartfloAgentNumber: e.target.value })
+                }
+                className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-black text-sm focus:outline-none focus:ring-2 focus:ring-[#cc2727] focus:border-[#cc2727] placeholder-slate-400 font-medium"
+              />
+              <p className="text-[10px] text-gray-500 mt-1">
+                Configures agent-first dialing to this user's Smartflo softphone or mobile.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-black mb-1">
+                Smartflo Outbound Caller ID / DID
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. +919228173971"
+                value={editForm.smartfloCallerId}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, smartfloCallerId: e.target.value })
+                }
+                className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-black text-sm focus:outline-none focus:ring-2 focus:ring-[#cc2727] focus:border-[#cc2727] placeholder-slate-400 font-medium"
+              />
+              <p className="text-[10px] text-gray-500 mt-1">
+                Outbound DID number assigned to this member in Smartflo.
+              </p>
+            </div>
+
             <div className="flex gap-2 pt-2">
               <button
                 type="button"
@@ -443,6 +483,26 @@ export default function MemberDetailModal({
                 {member.status === "inactive"
                   ? "Disabled (Cannot Login)"
                   : "Enabled (Can Login)"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1.5 border-b border-slate-200">
+              <span className="text-gray-600 flex items-center gap-2 shrink-0">
+                <Phone className="w-4 h-4 text-emerald-600" />
+                Smartflo Extension / ID
+              </span>
+              <span className="font-mono font-bold text-black text-right ml-4">
+                {member.smartfloAgentNumber || member.smartfloAgentId || "Not configured"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between py-1.5 border-b border-slate-200">
+              <span className="text-gray-600 flex items-center gap-2 shrink-0">
+                <Phone className="w-4 h-4 text-[#cc2727]" />
+                Smartflo Caller ID / DID
+              </span>
+              <span className="font-mono font-bold text-black text-right ml-4">
+                {member.smartfloCallerId || "Not configured"}
               </span>
             </div>
 
