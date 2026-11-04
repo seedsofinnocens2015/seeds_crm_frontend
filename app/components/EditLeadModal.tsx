@@ -87,11 +87,10 @@ export default function EditLeadModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Wife Name *
+                    Wife Name
                   </label>
                   <input
                     type="text"
-                    required
                     name="wifeName"
                     value={formData.wifeName}
                     onChange={handleChange}
@@ -101,11 +100,10 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Husband Name *
+                    Husband Name
                   </label>
                   <input
                     type="text"
-                    required
                     name="husbandName"
                     value={formData.husbandName}
                     onChange={handleChange}
@@ -115,11 +113,10 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Wife Age (2 Digits) *
+                    Wife Age (2 Digits)
                   </label>
                   <input
                     type="text"
-                    required
                     maxLength={2}
                     value={formData.wifeAge}
                     onChange={(e) => handleAgeChange(e, "wifeAge")}
@@ -129,11 +126,10 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Husband Age (2 Digits) *
+                    Husband Age (2 Digits)
                   </label>
                   <input
                     type="text"
-                    required
                     maxLength={2}
                     value={formData.husbandAge}
                     onChange={(e) => handleAgeChange(e, "husbandAge")}
@@ -143,11 +139,10 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Married Since (Years) *
+                    Married Since (Years)
                   </label>
                   <input
                     type="text"
-                    required
                     value={formData.marriedSince}
                     onChange={(e) => handleNumberOnlyChange(e, "marriedSince")}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
@@ -156,11 +151,10 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    How long trying to conceive *
+                    How long trying to conceive
                   </label>
                   <input
                     type="text"
-                    required
                     value={formData.tryingToConceiveYears}
                     onChange={(e) => handleNumberOnlyChange(e, "tryingToConceiveYears")}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
@@ -169,7 +163,7 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Pre Medical Conditions *
+                    Pre Medical Conditions
                   </label>
                   <select
                     name="preMedicalConditions"
@@ -177,6 +171,7 @@ export default function EditLeadModal({
                     onChange={handleChange}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                   >
+                    <option value="">Select Option</option>
                     <option value="No">No</option>
                     <option value="Yes">Yes</option>
                   </select>
@@ -214,11 +209,10 @@ export default function EditLeadModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Primary Mobile number *
+                    Primary Mobile number
                   </label>
                   <input
                     type="text"
-                    required
                     name="primaryMobileNumber"
                     value={formData.primaryMobileNumber}
                     onChange={handleChange}
@@ -334,7 +328,7 @@ export default function EditLeadModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Campaign Name *
+                    Campaign Name
                   </label>
                   <select
                     name="campaignName"
@@ -342,6 +336,7 @@ export default function EditLeadModal({
                     onChange={handleCampaignNameChange}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                   >
+                    <option value="">Select Campaign</option>
                     {CAMPAIGN_NAMES.map((c) => (
                       <option key={c} value={c}>
                         {c}
@@ -352,7 +347,7 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Source Channel *
+                    Source Channel
                   </label>
                   <select
                     name="source"
@@ -360,6 +355,7 @@ export default function EditLeadModal({
                     onChange={handleChange}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                   >
+                    <option value="">Select Channel</option>
                     {GENERAL_SOURCES.map((src) => (
                       <option key={src} value={src}>
                         {src}
@@ -389,7 +385,7 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Lead Source / UTM Source *
+                    Lead Source / UTM Source
                   </label>
                   <select
                     name="leadSource"
@@ -397,6 +393,7 @@ export default function EditLeadModal({
                     onChange={handleChange}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                   >
+                    <option value="">Select Source</option>
                     {LEAD_SOURCES.map((s) => (
                       <option key={s} value={s}>
                         {s}
@@ -449,7 +446,7 @@ export default function EditLeadModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Sub Status *
+                    Sub Status
                   </label>
                   <select
                     name="subStatus"
@@ -492,7 +489,7 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Centre Location *
+                    Centre Location
                   </label>
                   <select
                     name="centreLocation"
@@ -530,7 +527,7 @@ export default function EditLeadModal({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Centre Address *
+                    Centre Address
                   </label>
                   <input
                     type="text"
