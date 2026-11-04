@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { getMonthFromDate, notifyLeadUpdated } from "@/lib/leadOptions";
+import { ALL_LEADS_COLUMNS } from "@/lib/columnsConfig";
 
 interface UploadLeadsModalProps {
   isOpen: boolean;
@@ -227,8 +228,10 @@ export default function UploadLeadsModal({
           return "";
         };
 
-        // 1. Extract Date from sheet (priority to Date / Date of Lead)
+        // Date extraction
         const rawDateVal = getRawVal(
+          "First Activity Date",
+          "firstActivityDate",
           "Date",
           "Date (DD-MMM-YY)",
           "date",
@@ -239,29 +242,56 @@ export default function UploadLeadsModal({
           "Timestamp",
           "leadTimestamp"
         );
-
         const parsedDate = parseAnyDate(rawDateVal);
         const parsedMonth = monthFromDDMMMYY(parsedDate) || (parsedDate ? getMonthFromDate(parsedDate) : "");
 
-        // 2. Time Stamp: if Excel already has a formatted timestamp with time, keep it, otherwise format with current upload time
-        const rawTimestampVal = getRawVal("Time Stamp", "leadTimestamp", "Timestamp");
+        const now = new Date();
+        let hrs = now.getHours();
+        const mins = String(now.getMinutes()).padStart(2, "0");
+        const ampm = hrs >= 12 ? "PM" : "AM";
+        hrs = hrs % 12;
+        hrs = hrs ? hrs : 12;
+        const strHours = String(hrs).padStart(2, "0");
+        const fallbackNow = `${String(now.getDate()).padStart(2, "0")}-${MONTH_NAMES[now.getMonth()]}-${String(now.getFullYear()).slice(-2)}, ${strHours}:${mins} ${ampm}`;
+
+        const rawTimestampVal = getRawVal("Time Stamp", "leadTimestamp", "Timestamp", "Created On", "createdOn");
         let parsedTimestamp = "";
         if (rawTimestampVal && String(rawTimestampVal).includes(":") && (String(rawTimestampVal).includes("AM") || String(rawTimestampVal).includes("PM"))) {
           parsedTimestamp = String(rawTimestampVal).trim();
         } else {
-          // Keep the exact lead date, with current upload time
-          const now = new Date();
-          let hrs = now.getHours();
-          const mins = String(now.getMinutes()).padStart(2, "0");
-          const ampm = hrs >= 12 ? "PM" : "AM";
-          hrs = hrs % 12;
-          hrs = hrs ? hrs : 12;
-          const strHours = String(hrs).padStart(2, "0");
           const effectiveDate = parsedDate || `${String(now.getDate()).padStart(2, "0")}-${MONTH_NAMES[now.getMonth()]}-${String(now.getFullYear()).slice(-2)}`;
           parsedTimestamp = `${effectiveDate}, ${strHours}:${mins} ${ampm}`;
         }
 
+        const rawFirstActivity = getRawVal("First Activity Date", "firstActivityDate");
+        const firstActivityDate = rawFirstActivity ? parseAnyDate(rawFirstActivity) || String(rawFirstActivity).trim() : parsedTimestamp;
+
+        // Couple Profile
+        const hName = getVal("Husband Name", "husbandName", "Spouse Name", "spouseName", "Spouse");
+        const wName = getVal("Wife Name", "wifeName", "Patient Name", "full_name", "Name", "name", "patient", "patientName");
+        const hAge = getVal("Husband Age", "husbandAge", "Spouse Age", "spouseAge");
+        const wAge = getVal("Wife Age", "wifeAge", "Patient Age", "Age", "age", "patientAge");
+
+        // Treatment & Clinical
+        const whenPlan = getVal(
+          "When are you planning to start treatment",
+          "whenPlanningToStartTreatment",
+          "Looking for Treatment",
+          "treatment",
+          "lookingForTreatment"
+        );
+        const preMed = getVal("Pre Medical Conditions", "preMedicalConditions", "Pre Conditions", "preConditions", "Medical History");
+        const marriedSince = getVal("Married Since", "marriedSince");
+        const tryingYears = getVal("How long you are trying to conceive", "tryingToConceiveYears", "tryingYears");
+
+        // Emails
+        const pEmail = getVal("Primary Email", "primaryEmail", "Email", "email", "Pt Email");
+        const sEmail = getVal("Secondary Email", "secondaryEmail", "Spouse Email");
+
+        // Phone Numbers
         const rawPhone = getVal(
+          "Primary Mobile number",
+          "primaryMobileNumber",
           "Mobile Number",
           "Phone Number",
           "phone_number",
@@ -272,142 +302,158 @@ export default function UploadLeadsModal({
         );
         const finalPhone = cleanPhoneNumber(rawPhone);
 
-        const altPhone = cleanPhoneNumber(
-          getVal("Alternate #", "Alternate Number", "alternateNumber", "alt_phone")
+        const rawAltPhone = getVal(
+          "Secondary Mobile number",
+          "secondaryMobileNumber",
+          "Alternate #",
+          "Alternate Number",
+          "alternateNumber",
+          "alt_phone"
         );
+        const altPhone = cleanPhoneNumber(rawAltPhone);
 
-        const pName = getVal(
-          "Wife Name",
-          "wifeName",
-          "Patient Name",
-          "full_name",
-          "Name",
-          "name",
-          "patient",
-          "patientName"
-        );
-        const hName = getVal(
-          "Husband Name",
-          "husbandName",
-          "Spouse Name",
-          "spouseName",
-          "Spouse"
-        );
-        const pAge = getVal("Patient Age", "Age", "age", "patientAge");
-        const sName = hName;
-        const sAge = getVal("Spouse Age", "spouseAge");
-        const loc = getVal("Location", "city", "City", "location", "Branch");
-        const caller = getVal("Caller Name", "callerName", "Caller", "Agent");
-        const leadSrc = getVal(
-          "Lead Source",
-          "leadSource",
-          "Source",
-          "platform",
-          "campaign"
-        );
+        const rawWhatsapp = getVal("Whatsapp Mobile Number", "whatsappMobileNumber", "whatsappNumber", "whatsapp");
+        const whatsappNumber = cleanPhoneNumber(rawWhatsapp);
+
+        const otherNumbers = getVal("Other Numbers", "otherNumbers");
+
+        // Consents
+        const waConsent = getVal("Whatsapp Consent", "whatsappConsent") || "No";
+        const callConsent = getVal("Calling Consent", "callingConsent") || "No";
+
+        // Source & Attribution
+        const leadSrc = getVal("Lead Source/UTM Source", "leadSource", "Lead Source", "utmSource", "UTM Source", "Source", "platform");
+        const campName = getVal("Campaign Name", "campaignName", "campaign");
+        const srcName = getVal("Source Name", "sourceName");
+        const src = getVal("Source", "source") || "General";
+        const leadScore = getVal("Lead Score", "leadScore") || "0";
+
+        // Status & Dispositions
+        const subDisp = getVal("Sub Status", "subStatus", "Sub Dispositions", "subDispositions", "Sub Disposition");
+        const disp = getVal("Lead Stage", "leadStage", "Dispositions", "dispositions", "Disposition");
+        const validStat = getVal("Lead Valid Status", "leadValidStatus", "Valid Status", "validStatus", "Validity");
+
+        // Creator & Modifier
+        const createdBy = getVal("Created By", "createdBy", "createdByMember", "Caller Name", "callerName", "Agent") || "Admin";
+        const createdOn = getVal("Created On", "createdOn") || parsedTimestamp;
+        const modifiedBy = getVal("Modified By", "modifiedBy", "modifiedByMember") || createdBy;
+        const modifiedOn = getVal("Modified On", "modifiedOn") || createdOn;
+
+        // Address
+        const centreLoc = getVal("Centre Location", "centreLocation", "Location", "city", "City", "location", "Branch");
+        const centreAddr = getVal("Centre Address", "centreAddress") || (centreLoc ? `${centreLoc} Centre` : "");
+        const ptAddr = getVal("Pt Address", "ptAddress", "Address", "address");
+        const ptPin = getVal("Pt Pincode", "ptPincode", "Pincode", "pincode", "Zip");
+        const ptCountry = getVal("Pt Country", "ptCountry") || "India";
+        const ptState = getVal("Pt State", "ptState", "State", "state");
+        const ptCity = getVal("Pt City", "ptCity", "City", "ptCity") || centreLoc;
+
+        // Ownership & Dates
+        const leadOwner = getVal("Lead Owner", "leadOwner", "Caller Name", "callerName", "Caller", "Agent");
+        const leadAge = getVal("Lead Age", "leadAge") || "0 days";
+        const campLoc = getVal("Camp Location", "campLocation");
+        const followUp = getVal("Follow Up Date and Time", "followUpDateTime", "Follow Up Date", "followUpDate", "Next Follow Up");
+        const centreVisited = parseAnyDate(getRawVal("Centre Visited Date", "centreVisitedDate"));
+        const campVisited = parseAnyDate(getRawVal("Camp Visited Date", "campVisitedDate"));
+
+        // Registration & Plan
+        const regStatus = getVal("Registration Status", "registrationStatus") || "No";
+        const regNum = getVal("Registration Number", "registrationNumber");
+        const regAmt = getVal("Registration Amount", "registrationAmount");
+        const pkg = getVal("Package", "package");
+        const plan = getVal("Plan", "plan");
+
+        // Notes & Appointment
+        const notes = getVal("Notes", "notes", "Remarks", "Observation", "Observations");
+        const apptDate = parseAnyDate(getRawVal("Appointment Date", "appointmentDate", "Consultation Date"));
+
+        // Additional / legacy fallback values
         const referred = getVal("Referred By", "referredBy", "Referral");
-        const treat = getVal(
-          "Looking for Treatment",
-          "Treatment",
-          "treatment",
-          "lookingForTreatment"
-        );
-        const treatReq = getVal(
-          "Treatment Requirements",
-          "treatmentRequirements",
-          "Requirements"
-        );
-        const preCond = getVal(
-          "Pre Conditions",
-          "preConditions",
-          "Medical History"
-        );
-        const surgDetails = getVal(
-          "Surgery Details",
-          "surgeryDetails",
-          "Surgical Data"
-        );
-        const followUp = parseAnyDate(getRawVal(
-          "Follow Up Date",
-          "followUpDate",
-          "Next Follow Up"
-        ));
-        const subDisp = getVal(
-          "Sub Dispositions",
-          "subDispositions",
-          "Sub Disposition"
-        );
-        const disp = getVal("Dispositions", "dispositions", "Disposition");
-        const validStat = getVal("Valid Status", "validStatus", "Validity");
-        const apptDate = parseAnyDate(getRawVal(
-          "Appointment Date",
-          "appointmentDate",
-          "Consultation Date"
-        ));
-        const apptMonth = monthFromDDMMMYY(apptDate) ||
-          getVal("Appointment Month", "appointmentMonth");
-        const apptSlot = getVal(
-          "Teleconsultation Slot",
-          "teleconsultationSlot",
-          "Slot"
-        );
-        const consultFee = getVal(
-          "Consultation Charges",
-          "consultationCharges",
-          "Fee"
-        );
-        const notes = getVal(
-          "Notes",
-          "notes",
-          "Remarks",
-          "Observation",
-          "Observations"
-        );
+        const treatReq = getVal("Treatment Requirements", "treatmentRequirements", "Requirements");
+        const surgDetails = getVal("Surgery Details", "surgeryDetails", "Surgical Data");
+        const apptSlot = getVal("Teleconsultation Slot", "teleconsultationSlot", "Slot");
+        const consultFee = getVal("Consultation Charges", "consultationCharges", "Fee");
         const surgDate = parseAnyDate(getRawVal("Surgery Date", "surgeryDate"));
         const surgCost = getVal("Surgery Cost", "surgeryCost");
-        const surgPay = getVal(
-          "Surgery Payment Received",
-          "surgeryPaymentReceived",
-          "Payment Received"
-        );
+        const surgPay = getVal("Surgery Payment Received", "surgeryPaymentReceived", "Payment Received");
 
         return {
+          // Exact 49 ALL_LEADS_COLUMNS
+          firstActivityDate: firstActivityDate,
+          husbandName: hName,
+          wifeName: wName,
+          husbandAge: hAge,
+          wifeAge: wAge,
+          whenPlanningToStartTreatment: whenPlan,
+          preMedicalConditions: preMed,
+          marriedSince: marriedSince,
+          tryingToConceiveYears: tryingYears,
+          primaryEmail: pEmail,
+          secondaryEmail: sEmail,
+          primaryMobileNumber: finalPhone,
+          secondaryMobileNumber: altPhone,
+          whatsappMobileNumber: whatsappNumber,
+          otherNumbers: otherNumbers,
+          whatsappConsent: waConsent,
+          callingConsent: callConsent,
+          leadSource: leadSrc || "Excel Import",
+          campaignName: campName,
+          sourceName: srcName,
+          source: src,
+          leadScore: leadScore,
+          subStatus: subDisp,
+          leadStage: disp,
+          leadValidStatus: validStat,
+          createdBy: createdBy,
+          createdOn: createdOn,
+          modifiedBy: modifiedBy,
+          modifiedOn: modifiedOn,
+          centreAddress: centreAddr,
+          ptAddress: ptAddr,
+          ptPincode: ptPin,
+          ptCountry: ptCountry,
+          ptState: ptState,
+          ptCity: ptCity,
+          leadOwner: leadOwner,
+          leadAge: leadAge,
+          campLocation: campLoc,
+          centreLocation: centreLoc,
+          followUpDateTime: followUp,
+          centreVisitedDate: centreVisited,
+          campVisitedDate: campVisited,
+          registrationStatus: regStatus,
+          registrationNumber: regNum,
+          registrationAmount: regAmt,
+          package: pkg,
+          plan: plan,
+          notes: notes,
+          appointmentDate: apptDate,
+
+          // Legacy / backward-compatibility aliases
           date: parsedDate,
           month: parsedMonth,
           leadTimestamp: parsedTimestamp,
           mobileNumber: finalPhone,
+          phoneNumber: finalPhone,
           alternateNumber: altPhone,
-          wifeName: pName,
-          patientName: pName,
-          husbandName: sName,
-          spouseName: sName,
-          wifeAge: pAge,
-          patientAge: pAge,
-          husbandAge: sAge,
-          spouseAge: sAge,
-          primaryMobileNumber: finalPhone,
-          secondaryMobileNumber: altPhone,
-          subStatus: subDisp,
-          leadStage: disp,
-          leadValidStatus: validStat,
-          centreLocation: loc,
-          location: loc,
-          callerName: caller,
-          leadSource: leadSrc || "Excel Import",
+          patientName: wName,
+          spouseName: hName,
+          patientAge: wAge,
+          spouseAge: hAge,
+          location: centreLoc,
+          callerName: leadOwner || createdBy,
           referredBy: referred,
-          lookingForTreatment: treat,
+          lookingForTreatment: whenPlan,
           treatmentRequirements: treatReq,
-          preConditions: preCond,
+          preConditions: preMed,
           surgeryDetails: surgDetails,
           followUpDate: followUp,
           subDispositions: subDisp,
           dispositions: disp,
           validStatus: validStat,
-          appointmentDate: apptDate,
-          appointmentMonth: apptMonth,
+          appointmentMonth: monthFromDDMMMYY(apptDate),
           teleconsultationSlot: apptSlot,
           consultationCharges: consultFee,
-          notes: notes,
           surgeryDate: surgDate,
           surgeryCost: surgCost,
           surgeryPaymentReceived: surgPay,
@@ -416,8 +462,12 @@ export default function UploadLeadsModal({
 
       // Filter out completely blank rows or rows with no mobile number and no patient name
       const validLeads = mapped.filter((l) => {
-        const hasMobile = !!(l.mobileNumber && l.mobileNumber.trim().length >= 10);
-        const hasName = !!(l.patientName && l.patientName.trim().length > 0);
+        const hasMobile = !!(l.primaryMobileNumber && l.primaryMobileNumber.trim().length >= 10);
+        const hasName = !!(
+          (l.wifeName && l.wifeName.trim().length > 0) ||
+          (l.husbandName && l.husbandName.trim().length > 0) ||
+          (l.patientName && l.patientName.trim().length > 0)
+        );
         return hasMobile || hasName;
       });
 
@@ -449,36 +499,60 @@ export default function UploadLeadsModal({
   };
 
   const handleDownloadSample = () => {
-    const sampleHeaders = [
-      {
-        "Patient Name": "Rahul Sharma",
-        "Mobile Number": "9876543210",
-        "Patient Age": "32",
-        "Location": "Delhi MN",
-        "Spouse Name": "Pooja Sharma",
-        "Spouse Age": "29",
-        "Alternate #": "9123456789",
-        "Caller Name": "Admin",
-        "Lead Source": "Google Search Ads",
-        "Looking for Treatment": "IVF",
-        "Treatment Requirements": "Initial Consultation",
-        "Pre Conditions": "None",
-        "Surgery Details": "N/A",
-        "Follow Up Date": "30-Sep-26",
-        "Sub Dispositions": "Appointment Booked",
-        "Dispositions": "Converted",
-        "Valid Status": "Valid",
-        "Appointment Date": "02-Oct-26",
-        "Teleconsultation Slot": "10:00 AM - 10:30 AM",
-        "Consultation Charges": "500",
-        "Surgery Date": "",
-        "Surgery Cost": "",
-        "Surgery Payment Received": "",
-        "Notes": "Patient interested in IVF treatment at Delhi branch.",
-      },
-    ];
+    // Generate sample template containing exact columns matching All Leads table (ALL_LEADS_COLUMNS)
+    const sampleRow: Record<string, any> = {
+      "First Activity Date": "28-Sep-26, 10:30 AM",
+      "Husband Name": "Rahul Sharma",
+      "Wife Name": "Pooja Sharma",
+      "Husband Age": "34",
+      "Wife Age": "30",
+      "When are you planning to start treatment": "Immediately",
+      "Pre Medical Conditions": "No",
+      "Married Since": "5",
+      "How long you are trying to conceive": "3",
+      "Primary Email": "pooja.sharma@example.com",
+      "Secondary Email": "rahul.sharma@example.com",
+      "Primary Mobile number": "9876543210",
+      "Secondary Mobile number": "9123456789",
+      "Whatsapp Mobile Number": "9876543210",
+      "Other Numbers": "",
+      "Whatsapp Consent": "Yes",
+      "Calling Consent": "Yes",
+      "Lead Source/UTM Source": "Google Search Ads",
+      "Campaign Name": "IVF Awareness 2026",
+      "Source Name": "Website Form",
+      "Source": "Google",
+      "Lead Score": "75",
+      "Sub Status": "Appointment Booked",
+      "Lead Stage": "Converted",
+      "Lead Valid Status": "Valid",
+      "Created By": "Admin",
+      "Created On": "28-Sep-26, 10:30 AM",
+      "Modified By": "Admin",
+      "Modified On": "28-Sep-26, 10:30 AM",
+      "Centre Address": "Delhi Malviya Nagar Centre",
+      "Pt Address": "Block B, Malviya Nagar",
+      "Pt Pincode": "110017",
+      "Pt Country": "India",
+      "Pt State": "Delhi",
+      "Pt City": "Delhi",
+      "Lead Owner": "Admin",
+      "Lead Age": "0 days",
+      "Camp Location": "",
+      "Centre Location": "Delhi MN",
+      "Follow Up Date and Time": "30-Sep-26",
+      "Centre Visited Date": "02-Oct-26",
+      "Camp Visited Date": "",
+      "Registration Status": "Yes",
+      "Registration Number": "REG-2026-001",
+      "Registration Amount": "500",
+      "Package": "IVF Standard",
+      "Plan": "Self Cycle",
+      "Notes": "Patient interested in IVF treatment at Delhi Malviya Nagar branch.",
+      "Appointment Date": "02-Oct-26",
+    };
 
-    const worksheet = XLSX.utils.json_to_sheet(sampleHeaders);
+    const worksheet = XLSX.utils.json_to_sheet([sampleRow]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Sample Template");
     XLSX.writeFile(workbook, "patient_leads_sample_template.xlsx");
@@ -642,13 +716,13 @@ export default function UploadLeadsModal({
                 </button>
               </div>
 
-              {/* Preview Table with all 28 columns and all rows */}
+              {/* Preview Table with all columns matching All Leads */}
               <div className="space-y-2">
                 <div className="text-xs font-bold text-black flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span>Preview All Detected Leads ({parsedLeads.length} Total):</span>
                     <span className="text-[11px] font-normal text-gray-500">
-                      (Showing all 28 fields)
+                      (Showing all {ALL_LEADS_COLUMNS.length} fields)
                     </span>
                   </div>
                   <span className="text-[11px] text-[#cc2727] font-semibold">
@@ -660,34 +734,11 @@ export default function UploadLeadsModal({
                     <thead className="bg-slate-100 text-black text-[11px] uppercase tracking-wider border-b border-slate-300 font-bold sticky top-0 z-10 shadow-sm">
                       <tr>
                         <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">#</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Patient Name</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Patient Age</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Location</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Spouse Name</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Spouse Age</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Date (DD-MMM-YY)</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Time Stamp</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Mobile Number</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Alternate #</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Caller Name</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Lead Source</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Referred By</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Looking for Treatment</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Treatment Requirements</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Pre Conditions</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Surgery Details</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Follow Up Date</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Sub Dispositions</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Dispositions</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Valid Status</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Appointment Date</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Appointment Month</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Teleconsultation Slot</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Consultation Charges</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Surgery Date</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Surgery Cost</th>
-                        <th className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">Surgery Payment Received</th>
-                        <th className="px-3 py-2.5 bg-slate-100">Notes</th>
+                        {ALL_LEADS_COLUMNS.map((col) => (
+                          <th key={col.id} className="px-3 py-2.5 border-r border-slate-200 bg-slate-100">
+                            {col.label}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -696,90 +747,25 @@ export default function UploadLeadsModal({
                           <td className="px-3 py-2 text-gray-500 font-mono border-r border-slate-100 text-center font-semibold">
                             {idx + 1}
                           </td>
-                          <td className="px-3 py-2 font-bold text-black border-r border-slate-100">
-                            {lead.patientName || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-black border-r border-slate-100 text-center">
-                            {lead.patientAge || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black border-r border-slate-100">
-                            {lead.location || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black border-r border-slate-100">
-                            {lead.spouseName || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-black border-r border-slate-100 text-center">
-                            {lead.spouseAge || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-black border-r border-slate-100">
-                            {lead.date || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-black border-r border-slate-100">
-                            {lead.leadTimestamp || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono font-bold text-black border-r border-slate-100">
-                            {lead.mobileNumber || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-black border-r border-slate-100">
-                            {lead.alternateNumber || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black font-semibold border-r border-slate-100">
-                            {lead.callerName || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black border-r border-slate-100">
-                            {lead.leadSource || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black border-r border-slate-100">
-                            {lead.referredBy || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black font-medium border-r border-slate-100">
-                            {lead.lookingForTreatment || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black max-w-xs truncate border-r border-slate-100" title={lead.treatmentRequirements}>
-                            {lead.treatmentRequirements || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black max-w-xs truncate border-r border-slate-100" title={lead.preConditions}>
-                            {lead.preConditions || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black max-w-xs truncate border-r border-slate-100" title={lead.surgeryDetails}>
-                            {lead.surgeryDetails || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-black border-r border-slate-100">
-                            {lead.followUpDate || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black border-r border-slate-100">
-                            {lead.subDispositions || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black border-r border-slate-100">
-                            {lead.dispositions || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black border-r border-slate-100">
-                            {lead.validStatus || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono font-medium text-black border-r border-slate-100">
-                            {lead.appointmentDate || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-black border-r border-slate-100">
-                            {lead.appointmentMonth || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black border-r border-slate-100">
-                            {lead.teleconsultationSlot || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-right text-black border-r border-slate-100">
-                            {lead.consultationCharges || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono font-medium text-black border-r border-slate-100">
-                            {lead.surgeryDate || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-right text-black border-r border-slate-100">
-                            {lead.surgeryCost || "-"}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-right font-bold text-emerald-700 border-r border-slate-100">
-                            {lead.surgeryPaymentReceived || "-"}
-                          </td>
-                          <td className="px-3 py-2 text-black max-w-md truncate" title={lead.notes}>
-                            {lead.notes || "-"}
-                          </td>
+                          {ALL_LEADS_COLUMNS.map((col) => {
+                            const val = lead[col.id];
+                            const displayVal = val !== undefined && val !== null && String(val).trim() !== "" ? String(val) : "-";
+                            return (
+                              <td
+                                key={col.id}
+                                className={`px-3 py-2 border-r border-slate-100 ${
+                                  col.id === "wifeName" || col.id === "husbandName"
+                                    ? "font-bold text-black"
+                                    : col.id.toLowerCase().includes("date") || col.id.toLowerCase().includes("time") || col.id.toLowerCase().includes("number") || col.id.toLowerCase().includes("age")
+                                    ? "font-mono text-black"
+                                    : "text-black"
+                                } max-w-xs truncate`}
+                                title={displayVal !== "-" ? displayVal : undefined}
+                              >
+                                {displayVal}
+                              </td>
+                            );
+                          })}
                         </tr>
                       ))}
                     </tbody>
@@ -787,7 +773,7 @@ export default function UploadLeadsModal({
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-gray-600 px-1 pt-1 font-medium">
                   <span>Showing all {parsedLeads.length} leads</span>
-                  <span>Scroll horizontally to view all 28 columns & vertically to view all rows</span>
+                  <span>Scroll horizontally to view all {ALL_LEADS_COLUMNS.length} columns &amp; vertically to view all rows</span>
                 </div>
               </div>
             </div>
