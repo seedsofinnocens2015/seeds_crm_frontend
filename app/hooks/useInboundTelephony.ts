@@ -191,10 +191,10 @@ export function useInboundTelephony() {
         }
       };
 
-      socket.on("inbound:ringing", handleRinging);
-      socket.on("inbound:answered", handleAnswered);
-      socket.on("inbound:missed", handleMissed);
-      socket.on("inbound:ended", handleEnded);
+      // INBOUND TELEPHONY SUSPENSION:
+      // Inbound event listeners (inbound:ringing, inbound:answered, inbound:missed, inbound:ended)
+      // are disabled. Only outbound events are retained.
+
       socket.on("outbound:initiating", handleOutboundInitiating);
       socket.on("outbound:ringing", handleOutboundRinging);
       socket.on("outbound:answered", handleOutboundAnswered);
@@ -202,10 +202,6 @@ export function useInboundTelephony() {
       socket.on("call:ended", handleOutboundEnded);
 
       return () => {
-        socket.off("inbound:ringing", handleRinging);
-        socket.off("inbound:answered", handleAnswered);
-        socket.off("inbound:missed", handleMissed);
-        socket.off("inbound:ended", handleEnded);
         socket.off("outbound:initiating", handleOutboundInitiating);
         socket.off("outbound:ringing", handleOutboundRinging);
         socket.off("outbound:answered", handleOutboundAnswered);

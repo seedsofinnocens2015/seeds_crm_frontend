@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import IncomingCallModal from "./components/IncomingCallModal";
+// Inbound telephony temporarily suspended; IncomingCallModal retained for future rebuilding
+// import IncomingCallModal from "./components/IncomingCallModal";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         {children}
-        <IncomingCallModal />
+        {/* <IncomingCallModal /> */}
       </body>
     </html>
   );
