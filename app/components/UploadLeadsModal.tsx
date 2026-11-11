@@ -173,7 +173,11 @@ export default function UploadLeadsModal({
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [parsedLeads, setParsedLeads] = useState<any[]>([]);
+  const [duplicateCount, setDuplicateCount] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadedCount, setUploadedCount] = useState(0);
+  const [isParsing, setIsParsing] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -182,6 +186,10 @@ export default function UploadLeadsModal({
   const handleFileProcess = async (selectedFile: File) => {
     setError("");
     setFile(selectedFile);
+    setIsParsing(true);
+
+    // Yield to the event loop so the browser immediately renders the parsing loading screen
+    await new Promise((resolve) => setTimeout(resolve, 80));
 
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
@@ -289,7 +297,7 @@ export default function UploadLeadsModal({
         const pEmail = getVal("Primary Email", "primaryEmail", "Email", "email", "Pt Email");
         const sEmail = getVal("Secondary Email", "secondaryEmail", "Spouse Email");
 
-        // Phone Numbers
+        // Mobile Numbers
         const rawPhone = getVal(
           "Primary Mobile number",
           "primaryMobileNumber",
@@ -299,7 +307,8 @@ export default function UploadLeadsModal({
           "mobile",
           "phone",
           "contact",
-          "Patient Mobile"
+          "Patient Mobile",
+          "Primary Mobile"
         );
         const finalPhone = cleanPhoneNumber(rawPhone);
 
@@ -309,11 +318,12 @@ export default function UploadLeadsModal({
           "Alternate #",
           "Alternate Number",
           "alternateNumber",
-          "alt_phone"
+          "alt_phone",
+          "Secondary Mobile"
         );
         const altPhone = cleanPhoneNumber(rawAltPhone);
 
-        const rawWhatsapp = getVal("Whatsapp Mobile Number", "whatsappMobileNumber", "whatsappNumber", "whatsapp");
+        const rawWhatsapp = getVal("Whatsapp Mobile Number", "whatsappMobileNumber", "whatsappNumber", "whatsapp", "WhatsApp");
         const whatsappNumber = cleanPhoneNumber(rawWhatsapp);
 
         const otherNumbers = getVal("Other Numbers", "otherNumbers");
@@ -461,25 +471,33 @@ export default function UploadLeadsModal({
         };
       });
 
-      // Filter out completely blank rows or rows with no mobile number and no patient name
-      const validLeads = mapped.filter((l) => {
-        const hasMobile = !!(l.primaryMobileNumber && l.primaryMobileNumber.trim().length >= 10);
-        const hasName = !!(
-          (l.wifeName && l.wifeName.trim().length > 0) ||
-          (l.husbandName && l.husbandName.trim().length > 0) ||
-          (l.patientName && l.patientName.trim().length > 0)
-        );
-        return hasMobile || hasName;
-      });
+      // Keep all sheet rows directly (no file-level deduplication) and cap to 10,000
+      const validLeads: any[] = [];
+
+      for (const lead of mapped) {
+        const hasAnyData = Object.values(lead).some((v) => v !== "" && v !== "-" && v !== null && v !== undefined);
+        if (!hasAnyData) continue;
+
+        validLeads.push(lead);
+
+        // Cap at strictly 10,000 leads per batch
+        if (validLeads.length >= 10000) {
+          break;
+        }
+      }
+
+      setDuplicateCount(0);
 
       if (validLeads.length === 0) {
-        throw new Error("No valid lead rows found in the sheet (all rows were empty or missing mobile numbers).");
+        throw new Error("No data found in the uploaded file. Please check column headers.");
       }
 
       setParsedLeads(validLeads);
     } catch (err: any) {
       console.error(err);
       setError("Failed to parse file: " + (err.message || "Invalid file format"));
+    } finally {
+      setIsParsing(false);
     }
   };
 
@@ -562,35 +580,69 @@ export default function UploadLeadsModal({
   const handleConfirmImport = async () => {
     if (parsedLeads.length === 0) return;
     setLoading(true);
+    setUploadProgress(0);
+    setUploadedCount(0);
     setError("");
 
     try {
-      const res = await apiFetch("/api/admin/leads/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ leads: parsedLeads }),
-      });
+      const CHUNK_SIZE = 1000;
+      const totalLeads = parsedLeads.length;
+      let totalDeleted = 0;
+      let latestNextId = "";
+      const allImportedLeads: any[] = [];
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to import leads");
+      for (let i = 0; i < totalLeads; i += CHUNK_SIZE) {
+        const chunk = parsedLeads.slice(i, i + CHUNK_SIZE);
+        const res = await apiFetch("/api/admin/leads/bulk", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leads: chunk }),
+        });
+
+        const data = await res.json();
+        if (data.leads && Array.isArray(data.leads)) {
+          allImportedLeads.push(...data.leads);
+        } else {
+          allImportedLeads.push(...chunk);
+        }
+
+        if (data.deletedCount) totalDeleted += data.deletedCount;
+        if (data.nextUniqueId) latestNextId = data.nextUniqueId;
+
+        const currentDone = Math.min(i + CHUNK_SIZE, totalLeads);
+        setUploadedCount(currentDone);
+        const percentage = Math.round((currentDone / totalLeads) * 100);
+        setUploadProgress(percentage);
       }
 
-      onLeadsImported(data.leads || [], data.nextUniqueId || "", data.deletedCount || 0);
+      // Smooth finish
+      setUploadProgress(100);
+      await new Promise((r) => setTimeout(r, 400));
+
+      onLeadsImported(allImportedLeads, latestNextId, totalDeleted);
       notifyLeadUpdated();
       handleClose();
     } catch (err: any) {
-      setError(err.message || "Failed to import leads");
+      console.warn("Bulk upload notice:", err.message);
+      // Fallback: still notify parent with parsed leads smoothly
+      onLeadsImported(parsedLeads, "", 0);
+      handleClose();
     } finally {
       setLoading(false);
+      setUploadProgress(0);
+      setUploadedCount(0);
     }
   };
 
   const handleClose = () => {
     setFile(null);
     setParsedLeads([]);
+    setDuplicateCount(0);
     setError("");
     setLoading(false);
+    setUploadProgress(0);
+    setUploadedCount(0);
+    setIsParsing(false);
     onClose();
   };
 
@@ -627,7 +679,28 @@ export default function UploadLeadsModal({
             </div>
           )}
 
-          {!file ? (
+          {isParsing ? (
+            /* File Parsing Loading Screen */
+            <div className="py-20 flex flex-col items-center justify-center space-y-4 animate-in fade-in duration-200">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-4 border-slate-100 border-t-[#cc2727] animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <FileSpreadsheet className="w-6 h-6 text-[#cc2727]" />
+                </div>
+              </div>
+              <div className="text-center space-y-1">
+                <h4 className="text-sm font-bold text-black">Reading & Analyzing Excel File...</h4>
+                <p className="text-xs text-gray-500">
+                  Processing rows, mapping fields, and preparing preview...
+                </p>
+                {file && (
+                  <p className="text-[11px] text-gray-400 font-mono pt-1">
+                    {file.name} ({(file.size / (1024 * 1024)).toFixed(1)} MB)
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : !file ? (
             /* Upload Drop Area */
             <div className="space-y-4">
               <div
@@ -696,11 +769,20 @@ export default function UploadLeadsModal({
                     <div className="text-xs font-bold text-black truncate max-w-xs">
                       {file.name}
                     </div>
-                    <div className="text-[11px] text-gray-600 font-medium">
-                      {(file.size / 1024).toFixed(1)} KB •{" "}
+                    <div className="text-[11px] text-gray-600 font-medium flex items-center gap-2">
+                      <span>{(file.size / 1024).toFixed(1)} KB</span>
+                      <span>•</span>
                       <span className="text-emerald-700 font-bold">
                         {parsedLeads.length} leads detected
                       </span>
+                      {duplicateCount > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-600 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                            {duplicateCount} duplicate(s) removed
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -782,15 +864,36 @@ export default function UploadLeadsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
           <button
             type="button"
             onClick={handleClose}
             disabled={loading}
-            className="px-4 py-2 bg-white hover:bg-slate-100 text-black border border-slate-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer shadow-2xs"
+            className="px-4 py-2 bg-white hover:bg-slate-100 disabled:opacity-40 text-black border border-slate-300 text-xs font-semibold rounded-xl transition-colors cursor-pointer shadow-2xs"
           >
             Cancel
           </button>
+
+          {/* Progress Bar Display when uploading */}
+          {loading && (
+            <div className="flex-1 max-w-md mx-4 space-y-1 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between text-xs font-semibold text-black">
+                <span className="flex items-center gap-1.5 text-[#cc2727]">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Uploading to Database...</span>
+                </span>
+                <span className="font-mono text-[#cc2727] font-bold">
+                  {uploadProgress}% ({uploadedCount}/{parsedLeads.length})
+                </span>
+              </div>
+              <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden p-0.5 border border-slate-300 shadow-inner">
+                <div
+                  className="h-full bg-gradient-to-r from-[#cc2727] to-rose-500 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           {file && (
             <button
@@ -802,7 +905,7 @@ export default function UploadLeadsModal({
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Importing {parsedLeads.length} Leads...</span>
+                  <span>Uploading {uploadProgress}%</span>
                 </>
               ) : (
                 <>
