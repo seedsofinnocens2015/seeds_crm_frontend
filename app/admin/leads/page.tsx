@@ -777,7 +777,8 @@ export default function AdminLeadsPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const handleLeadsImported = (importedLeads: any[], newNextId: string, deletedCount?: number) => {
-    fetchSessionAndLeads();
+    invalidateLeadsCache("admin");
+    fetchSessionAndLeads(false, 1);
     notifyLeadUpdated();
     if (newNextId) {
       setNextUniqueId(newNextId);

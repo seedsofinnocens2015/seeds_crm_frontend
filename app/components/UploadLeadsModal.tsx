@@ -599,13 +599,12 @@ export default function UploadLeadsModal({
           body: JSON.stringify({ leads: chunk }),
         });
 
-        const data = await res.json();
-        if (data.leads && Array.isArray(data.leads)) {
-          allImportedLeads.push(...data.leads);
-        } else {
-          allImportedLeads.push(...chunk);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Server responded with status ${res.status}`);
         }
 
+        const data = await res.json();
         if (data.deletedCount) totalDeleted += data.deletedCount;
         if (data.nextUniqueId) latestNextId = data.nextUniqueId;
 
@@ -619,14 +618,12 @@ export default function UploadLeadsModal({
       setUploadProgress(100);
       await new Promise((r) => setTimeout(r, 400));
 
-      onLeadsImported(allImportedLeads, latestNextId, totalDeleted);
+      onLeadsImported(parsedLeads, latestNextId, totalDeleted);
       notifyLeadUpdated();
       handleClose();
     } catch (err: any) {
-      console.warn("Bulk upload notice:", err.message);
-      // Fallback: still notify parent with parsed leads smoothly
-      onLeadsImported(parsedLeads, "", 0);
-      handleClose();
+      console.error("Bulk upload error:", err);
+      setError(err.message || "Failed to upload leads. Please try again.");
     } finally {
       setLoading(false);
       setUploadProgress(0);
