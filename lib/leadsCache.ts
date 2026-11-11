@@ -5,26 +5,28 @@
 interface LeadsCacheEntry {
   leads: any[];
   nextUniqueId?: string;
+  totalCount?: number;
   timestamp: number;
 }
 
 const memoryCache = new Map<string, LeadsCacheEntry>();
 const CACHE_TTL = 3 * 60 * 1000; // 3 minutes fresh cache
 
-export function getCachedLeads(roleOrKey: string): { leads: any[]; nextUniqueId?: string } | null {
+export function getCachedLeads(roleOrKey: string): { leads: any[]; nextUniqueId?: string; totalCount?: number } | null {
   const entry = memoryCache.get(roleOrKey);
   if (!entry) return null;
   // If entry exists within TTL, return it
   if (Date.now() - entry.timestamp < CACHE_TTL) {
-    return { leads: entry.leads, nextUniqueId: entry.nextUniqueId };
+    return { leads: entry.leads, nextUniqueId: entry.nextUniqueId, totalCount: entry.totalCount };
   }
   return null;
 }
 
-export function setCachedLeads(roleOrKey: string, leads: any[], nextUniqueId?: string) {
+export function setCachedLeads(roleOrKey: string, leads: any[], nextUniqueId?: string, totalCount?: number) {
   memoryCache.set(roleOrKey, {
     leads,
     nextUniqueId,
+    totalCount,
     timestamp: Date.now(),
   });
 }

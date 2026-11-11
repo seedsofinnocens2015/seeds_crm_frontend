@@ -113,8 +113,12 @@ export default function AdminLeadsPage() {
   const cachedInitial = typeof window !== "undefined" ? getCachedLeads("admin") : null;
   const [user, setUser] = useState<any>(null);
   const [leads, setLeads] = useState<any[]>(() => cachedInitial?.leads || []);
+  const [totalLeadsCount, setTotalLeadsCount] = useState<number>(() => cachedInitial?.totalCount || 0);
   const [nextUniqueId, setNextUniqueId] = useState<string>(() => cachedInitial?.nextUniqueId || "SOI-1");
   const [loading, setLoading] = useState(() => !cachedInitial);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 100;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [toastMessage, setToastMessage] = useState("");
@@ -788,12 +792,15 @@ export default function AdminLeadsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const fetchSessionAndLeads = async (isBackground = false) => {
+  const fetchSessionAndLeads = async (isBackground = false, targetPage = currentPage) => {
     try {
+      if (!isBackground && leads.length > 0) {
+        setPageLoading(true);
+      }
       // Parallel execution of Auth verification, Leads fetch, and Members fetch
       const [meRes, leadsRes, membersRes] = await Promise.all([
         apiFetch("/api/auth/me"),
-        apiFetch("/api/admin/leads", { cache: "no-store" }),
+        apiFetch(`/api/admin/leads?page=${targetPage}&limit=100`, { cache: "no-store" }),
         apiFetch("/api/admin/members").catch(() => null),
       ]);
 
@@ -820,17 +827,30 @@ export default function AdminLeadsPage() {
         const leadsData = await leadsRes.json();
         const loadedLeads = leadsData.leads || [];
         setLeads(loadedLeads);
+        if (leadsData.totalCount !== undefined) {
+          setTotalLeadsCount(leadsData.totalCount);
+        }
         if (leadsData.nextUniqueId) {
           setNextUniqueId(leadsData.nextUniqueId);
         }
         // Save to client-side memory cache for instant back-navigation
-        setCachedLeads("admin", loadedLeads, leadsData.nextUniqueId);
+        setCachedLeads("admin", loadedLeads, leadsData.nextUniqueId, leadsData.totalCount);
       }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+      setPageLoading(false);
     }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage === currentPage) return;
+    setCurrentPage(newPage);
+    if (tableScrollRef.current) {
+      tableScrollRef.current.scrollTop = 0;
+    }
+    fetchSessionAndLeads(false, newPage);
   };
 
   useEffect(() => {
@@ -1205,27 +1225,10 @@ export default function AdminLeadsPage() {
     });
   }, [leads, searchQuery, filters]);
 
-  // High-performance windowed pagination (100 leads per page)
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 100;
-  const totalPages = Math.max(1, Math.ceil(filteredLeads.length / pageSize));
+  // Server-backed pagination & active page counts
+  const totalPages = Math.max(1, Math.ceil((totalLeadsCount || filteredLeads.length) / pageSize));
 
-  // Reset to page 1 whenever filters or search query change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, filters]);
-
-  // Keep page within bounds
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [totalPages, currentPage]);
-
-  const paginatedLeads = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredLeads.slice(startIndex, startIndex + pageSize);
-  }, [filteredLeads, currentPage, pageSize]);
+  const paginatedLeads = filteredLeads;
 
   // Restore scroll position instantly after data is loaded (clean, professional, no animated jumping)
   useEffect(() => {
@@ -1289,7 +1292,7 @@ export default function AdminLeadsPage() {
             <FolderKanban className="w-5 h-5 text-[#cc2727]" />
             <h1 className="text-base font-bold text-black">All Leads</h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#cc2727]/10 text-[#cc2727] border border-[#cc2727]/20 font-semibold ml-2">
-              {filteredLeads.length} {filteredLeads.length === leads.length ? "Total" : `of ${leads.length}`}
+              {totalLeadsCount > 0 ? `${totalLeadsCount} Total` : `${leads.length} Total`}
             </span>
           </div>
 
@@ -1993,19 +1996,17 @@ export default function AdminLeadsPage() {
             )}
 
             {/* Pagination Controls */}
-            {filteredLeads.length > pageSize && (
+            {totalPages > 1 && (
               <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-black shadow-xs">
                 <span className="text-gray-500">
-                  Showing <strong className="text-black">{((currentPage - 1) * pageSize) + 1}</strong> - <strong className="text-black">{Math.min(currentPage * pageSize, filteredLeads.length)}</strong> of <strong className="text-black">{filteredLeads.length}</strong> leads
+                  Showing <strong className="text-black">{((currentPage - 1) * pageSize) + 1}</strong> - <strong className="text-black">{Math.min(currentPage * pageSize, totalLeadsCount || filteredLeads.length)}</strong> of <strong className="text-black">{totalLeadsCount || filteredLeads.length}</strong> leads
+                  {pageLoading && <span className="ml-2 text-[#cc2727] animate-pulse">Loading...</span>}
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setCurrentPage((p) => Math.max(1, p - 1));
-                      if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
-                    }}
-                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1 || pageLoading}
                     className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-black cursor-pointer transition-colors"
                     title="Previous page"
                   >
@@ -2016,11 +2017,8 @@ export default function AdminLeadsPage() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setCurrentPage((p) => Math.min(totalPages, p + 1));
-                      if (tableScrollRef.current) tableScrollRef.current.scrollTop = 0;
-                    }}
-                    disabled={currentPage >= totalPages}
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage >= totalPages || pageLoading}
                     className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-black cursor-pointer transition-colors"
                     title="Next page"
                   >
