@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Shield, Eye, EyeOff, AlertCircle } from "lucide-react";
 import Footer from "@/app/components/Footer";
+import { apiFetch } from "@/lib/api";
 
 function TeamLeaderLoginForm() {
   const router = useRouter();
@@ -19,7 +20,7 @@ function TeamLeaderLoginForm() {
   useEffect(() => {
     async function checkExistingAuth() {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await apiFetch("/api/auth/me");
         if (res.ok) {
           const data = await res.json();
           if (data?.user?.status === "active") {
@@ -53,13 +54,20 @@ function TeamLeaderLoginForm() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, requiredRole: "team_leader" }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      let data: any = {};
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(`Server returned ${res.status}: ${text.slice(0, 150)}`);
+      }
 
       if (!res.ok) {
         throw new Error(data.error || "Login failed");
