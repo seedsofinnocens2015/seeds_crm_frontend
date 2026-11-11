@@ -51,7 +51,14 @@ export default function AdminLoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      let data: any = {};
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(`Server returned ${res.status} (${res.statusText}): ${text.slice(0, 150)}`);
+      }
 
       if (!res.ok) {
         throw new Error(data.error || "Login failed");

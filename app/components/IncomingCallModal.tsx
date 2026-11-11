@@ -182,23 +182,14 @@ export default function IncomingCallModal() {
 
         {/* Actions Footer */}
         <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-          {activeCall.leadMatched ? (
-            <button
-              onClick={handleOpenLead}
-              className="flex-1 inline-flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition shadow-sm"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Open Lead Details</span>
-            </button>
-          ) : (
-            <button
-              onClick={() => router.push(`/leads/new?phone=${encodeURIComponent(activeCall.callerNumber)}`)}
-              className="flex-1 inline-flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition shadow-sm"
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>Create Lead</span>
-            </button>
-          )}
+          <button
+            onClick={handleOpenLead}
+            disabled={!activeCall.lead?.uniqueId && !activeCall.lead?.id}
+            className="flex-1 inline-flex items-center justify-center space-x-1.5 py-2 px-3 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 transition shadow-sm"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Show Lead</span>
+          </button>
 
           <button
             onClick={dismissCall}

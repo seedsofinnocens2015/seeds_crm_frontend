@@ -31,7 +31,7 @@ export interface OutboundCallEndedEvent {
   leadId?: string;
   leadUniqueId?: string;
   customerNumber?: string;
-  status: "answered" | "missed" | "ended" | "failed" | "completed";
+  status: "initiating" | "ringing" | "answered" | "missed" | "ended" | "failed" | "completed";
   durationSeconds?: number;
   timestamp: string;
 }
@@ -169,10 +169,34 @@ export function useInboundTelephony() {
         }
       };
 
+      const handleOutboundInitiating = (data: OutboundCallEndedEvent) => {
+        console.info(`[InboundTelephony Socket] Received outbound:initiating at ${new Date().toISOString()}:`, data);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("telephony:outbound_initiating", { detail: data }));
+        }
+      };
+
+      const handleOutboundRinging = (data: OutboundCallEndedEvent) => {
+        console.info(`[InboundTelephony Socket] Received outbound:ringing at ${new Date().toISOString()}:`, data);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("telephony:outbound_ringing", { detail: data }));
+        }
+      };
+
+      const handleOutboundAnswered = (data: OutboundCallEndedEvent) => {
+        console.info(`[InboundTelephony Socket] Received outbound:answered at ${new Date().toISOString()}:`, data);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("telephony:outbound_answered", { detail: data }));
+        }
+      };
+
       socket.on("inbound:ringing", handleRinging);
       socket.on("inbound:answered", handleAnswered);
       socket.on("inbound:missed", handleMissed);
       socket.on("inbound:ended", handleEnded);
+      socket.on("outbound:initiating", handleOutboundInitiating);
+      socket.on("outbound:ringing", handleOutboundRinging);
+      socket.on("outbound:answered", handleOutboundAnswered);
       socket.on("outbound:ended", handleOutboundEnded);
       socket.on("call:ended", handleOutboundEnded);
 
@@ -181,6 +205,9 @@ export function useInboundTelephony() {
         socket.off("inbound:answered", handleAnswered);
         socket.off("inbound:missed", handleMissed);
         socket.off("inbound:ended", handleEnded);
+        socket.off("outbound:initiating", handleOutboundInitiating);
+        socket.off("outbound:ringing", handleOutboundRinging);
+        socket.off("outbound:answered", handleOutboundAnswered);
         socket.off("outbound:ended", handleOutboundEnded);
         socket.off("call:ended", handleOutboundEnded);
 

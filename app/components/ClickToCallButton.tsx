@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Phone, PhoneCall, PhoneOff, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Phone, PhoneCall, PhoneOff, Loader2, AlertCircle, Clock } from "lucide-react";
+
+export type CallLifecycleState = "IDLE" | "INITIATING" | "RINGING" | "CONNECTED" | "ENDING" | "ERROR";
 
 interface ClickToCallButtonProps {
   leadId: string; // uniqueId or _id
@@ -18,61 +20,185 @@ export default function ClickToCallButton({
   onSuccess,
   onError,
 }: ClickToCallButtonProps) {
-  // Call initiation states
-  const [status, setStatus] = useState<"idle" | "calling" | "active" | "error">("idle");
+  // Call-state-aware lifecycle states
+  const [callState, setCallState] = useState<CallLifecycleState>("IDLE");
   const [feedback, setFeedback] = useState<string>("");
 
-  // Active call tracking for Hangup
+  // Active call identifiers
   const [activeRefId, setActiveRefId] = useState<string>("");
-  const [hangupStatus, setHangupStatus] = useState<"idle" | "hanging_up" | "disconnect_pending">("idle");
+  const [activeCallId, setActiveCallId] = useState<string>("");
 
-  // Listen for real-time call termination events (e.g. customer disconnects or hangup completed)
+  // Connected call duration timer (seconds)
+  const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Authenticated user ID for agent-specific correlation
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+
+  // Fetch current user on mount for private routing checks
   useEffect(() => {
-    const handleCallEnded = (e: Event) => {
-      const customEvent = e as CustomEvent<{
-        refId?: string;
-        callId?: string;
-        leadId?: string;
-        leadUniqueId?: string;
-      }>;
-      const detail = customEvent.detail;
-      if (!detail) return;
-
-      const matchesRef = activeRefId && detail.refId && detail.refId === activeRefId;
-      const matchesLead =
-        (leadId && detail.leadId && (detail.leadId === leadId || String(detail.leadId).toLowerCase() === String(leadId).toLowerCase())) ||
-        (leadId && detail.leadUniqueId && (detail.leadUniqueId === leadId || String(detail.leadUniqueId).toLowerCase() === String(leadId).toLowerCase()));
-
-      if (matchesRef || matchesLead) {
-        setStatus("idle");
-        setActiveRefId("");
-        setHangupStatus("idle");
-        setFeedback("Call Ended");
-        setTimeout(() => {
-          setFeedback("");
-        }, 3000);
+    let isMounted = true;
+    async function loadMe() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data?.user?.id) {
+            setCurrentUserId(String(data.user.id));
+          }
+        }
+      } catch {
+        // ignore
       }
+    }
+    loadMe();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Timer effect for connected calls
+  useEffect(() => {
+    if (callState === "CONNECTED") {
+      setSecondsElapsed(0);
+      timerRef.current = setInterval(() => {
+        setSecondsElapsed((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setSecondsElapsed(0);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [callState]);
+
+  // Check active call on initial mount / page refresh
+  useEffect(() => {
+    let isMounted = true;
+    async function checkActiveCall() {
+      if (!leadId) return;
+      try {
+        const res = await fetch(`/api/integrations/smartflo/calls/${encodeURIComponent(leadId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const calls = data?.calls || [];
+        if (!Array.isArray(calls) || calls.length === 0) return;
+
+        // Find most recent active call for this lead
+        const active = calls.find((c: any) => {
+          const isOngoing = c.status === "in_progress" || c.status === "ringing" || c.status === "connected";
+          // If agentUserId is known, match current user
+          if (c.agentUserId && currentUserId && c.agentUserId !== currentUserId) {
+            return false;
+          }
+          return isOngoing;
+        });
+
+        if (active && isMounted) {
+          if (active.status === "connected") {
+            setCallState("CONNECTED");
+            setActiveRefId(active.refId || "");
+            setActiveCallId(active.callId || "");
+            if (active.answeredDurationSeconds > 0) {
+              setSecondsElapsed(active.answeredDurationSeconds);
+            }
+          } else if (active.status === "in_progress" || active.status === "ringing") {
+            setCallState("RINGING");
+            setActiveRefId(active.refId || "");
+            setActiveCallId(active.callId || "");
+          }
+        }
+      } catch {
+        // ignore network error on active check
+      }
+    }
+
+    checkActiveCall();
+    return () => {
+      isMounted = false;
+    };
+  }, [leadId, currentUserId]);
+
+  // Event matching helper: matches by refId, callId, or leadId/uniqueId
+  const matchesCurrentCall = (detail: any) => {
+    if (!detail) return false;
+    const matchesRef = activeRefId && detail.refId && detail.refId === activeRefId;
+    const matchesCall = activeCallId && detail.callId && detail.callId === activeCallId;
+    const matchesLead =
+      (leadId && detail.leadId && (detail.leadId === leadId || String(detail.leadId).toLowerCase() === String(leadId).toLowerCase())) ||
+      (leadId && detail.leadUniqueId && (detail.leadUniqueId === leadId || String(detail.leadUniqueId).toLowerCase() === String(leadId).toLowerCase()));
+
+    return Boolean(matchesRef || matchesCall || matchesLead);
+  };
+
+  // Real-time synchronization listeners via window CustomEvents dispatched by useInboundTelephony
+  useEffect(() => {
+    // 1. Ringing / Dialed on agent
+    const handleOutboundRinging = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!matchesCurrentCall(detail)) return;
+
+      setCallState("RINGING");
+      if (detail.refId) setActiveRefId(detail.refId);
+      if (detail.callId) setActiveCallId(detail.callId);
+      setFeedback("Ringing Smartflo Agent...");
+    };
+
+    // 2. Answered / Connected
+    const handleOutboundAnswered = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!matchesCurrentCall(detail)) return;
+
+      setCallState("CONNECTED");
+      if (detail.refId) setActiveRefId(detail.refId);
+      if (detail.callId) setActiveCallId(detail.callId);
+      setFeedback("Call Connected");
+    };
+
+    // 3. Call Ended / Terminal
+    const handleCallEnded = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!matchesCurrentCall(detail)) return;
+
+      setCallState("IDLE");
+      setActiveRefId("");
+      setActiveCallId("");
+      setFeedback("Call Ended");
+      setTimeout(() => {
+        setFeedback("");
+      }, 3000);
     };
 
     if (typeof window !== "undefined") {
+      window.addEventListener("telephony:outbound_ringing", handleOutboundRinging);
+      window.addEventListener("telephony:outbound_answered", handleOutboundAnswered);
       window.addEventListener("telephony:call_ended", handleCallEnded);
     }
 
     return () => {
       if (typeof window !== "undefined") {
+        window.removeEventListener("telephony:outbound_ringing", handleOutboundRinging);
+        window.removeEventListener("telephony:outbound_answered", handleOutboundAnswered);
         window.removeEventListener("telephony:call_ended", handleCallEnded);
       }
     };
-  }, [activeRefId, leadId]);
+  }, [activeRefId, activeCallId, leadId]);
+
+  const formatTimer = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
 
   // Handle Initiating Call
   const handleCall = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
 
-    if (status === "calling" || status === "active") return; // prevent double clicks
+    if (callState !== "IDLE" && callState !== "ERROR") return; // prevent repeated clicks
 
-    setStatus("calling");
+    setCallState("INITIATING");
     setFeedback("");
 
     try {
@@ -90,34 +216,28 @@ export default function ClickToCallButton({
 
       if (!res.ok) {
         const errorText = data.error || data.message || "Failed to initiate call";
-        if (
-          errorText.includes("Extension ID in Profile Settings") ||
-          errorText.includes("Agent telephony identifier not configured") ||
-          errorText.includes("Caller ID in Profile Settings") ||
-          errorText.includes("Extension")
-        ) {
-          throw new Error(errorText);
-        }
         throw new Error(errorText);
       }
 
-      setStatus("active");
+      // Initiation succeeded: remain in INITIATING / RINGING state until agent actually answers
+      setCallState("RINGING");
       const ref = data.refId || "";
       if (ref) setActiveRefId(ref);
+      const callIdentifier = data.callId || "";
+      if (callIdentifier) setActiveCallId(callIdentifier);
 
-      const msg = data.message || "Call initiated! Ringing your extension first...";
+      const msg = data.message || "Calling... Waiting for agent to answer";
       setFeedback(msg);
       if (onSuccess) onSuccess(msg);
     } catch (err: any) {
-      setStatus("error");
+      setCallState("IDLE");
       const errMsg = err.message || "Call request failed";
       setFeedback(errMsg);
       if (onError) onError(errMsg);
 
       setTimeout(() => {
-        setStatus("idle");
         setFeedback("");
-      }, 5000);
+      }, 4000);
     }
   };
 
@@ -126,9 +246,9 @@ export default function ClickToCallButton({
     e.stopPropagation();
     e.preventDefault();
 
-    if (hangupStatus === "hanging_up" || hangupStatus === "disconnect_pending") return;
+    if (callState === "ENDING") return; // prevent repeated clicks
 
-    setHangupStatus("hanging_up");
+    setCallState("ENDING");
 
     try {
       const res = await fetch("/api/integrations/smartflo/hangup", {
@@ -138,23 +258,24 @@ export default function ClickToCallButton({
         },
         body: JSON.stringify({
           leadId,
-          refId: activeRefId,
+          refId: activeRefId || undefined,
+          callId: activeCallId || undefined,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        // If Smartflo reports call is already disconnected / invalid ref ID, clear active state immediately
         const errorText = data.error || data.message || "";
         if (
           errorText.includes("Invalid Ref ID") ||
           errorText.includes("already ended") ||
-          errorText.includes("Call is not active")
+          errorText.includes("Call is not active") ||
+          errorText.includes("not active")
         ) {
-          setStatus("idle");
+          setCallState("IDLE");
           setActiveRefId("");
-          setHangupStatus("idle");
+          setActiveCallId("");
           setFeedback("Call Ended");
           setTimeout(() => setFeedback(""), 3000);
           return;
@@ -162,52 +283,48 @@ export default function ClickToCallButton({
         throw new Error(data.error || "Failed to hang up call");
       }
 
-      // If Smartflo returns success: true with "Call has already ended."
+      // If Smartflo confirms call was already terminated
       if (data.message && data.message.includes("already ended")) {
-        setStatus("idle");
+        setCallState("IDLE");
         setActiveRefId("");
-        setHangupStatus("idle");
+        setActiveCallId("");
         setFeedback("Call Ended");
         setTimeout(() => setFeedback(""), 3000);
         return;
       }
 
-      // Requirement: Show pending-disconnect state until webhook confirms final call status
-      setHangupStatus("disconnect_pending");
-      const msg = data.message || "Hangup request accepted. Disconnecting...";
+      // Normal acceptance: state remains ENDING until confirmed by webhook / socket
+      const msg = data.message || "Disconnecting call...";
       setFeedback(msg);
       if (onSuccess) onSuccess(msg);
 
-      // Transition out of active state after brief transition window
+      // Graceful timeout fallback in case socket event is delayed
       setTimeout(() => {
-        setStatus("idle");
+        setCallState((prev) => (prev === "ENDING" ? "IDLE" : prev));
         setActiveRefId("");
-        setHangupStatus("idle");
+        setActiveCallId("");
         setFeedback("");
-      }, 3000);
+      }, 3500);
     } catch (err: any) {
-      setHangupStatus("idle");
       const errMsg = err.message || "Failed to hang up call";
-
-      // If error message indicates call was already terminated, reset active state gracefully
       if (
         errMsg.includes("Invalid Ref ID") ||
         errMsg.includes("already ended") ||
-        errMsg.includes("Call is not active")
+        errMsg.includes("Call is not active") ||
+        errMsg.includes("not active")
       ) {
-        setStatus("idle");
+        setCallState("IDLE");
         setActiveRefId("");
+        setActiveCallId("");
         setFeedback("Call Ended");
         setTimeout(() => setFeedback(""), 3000);
         return;
       }
 
+      setCallState("CONNECTED"); // restore connected state if hangup request rejected
       setFeedback(errMsg);
       if (onError) onError(errMsg);
-
-      setTimeout(() => {
-        setFeedback("");
-      }, 5000);
+      setTimeout(() => setFeedback(""), 5000);
     }
   };
 
@@ -219,24 +336,34 @@ export default function ClickToCallButton({
         {phoneDisplay && phoneDisplay.trim() !== "-" && phoneDisplay.trim() !== "" && (
           <button
             type="button"
-            title={status === "calling" ? "Initiating Call..." : "Call Lead via Smartflo"}
-            disabled={status === "calling" || status === "active"}
+            title={
+              callState === "INITIATING" || callState === "RINGING"
+                ? "Calling... Waiting for Agent"
+                : callState === "CONNECTED"
+                ? "Call Connected"
+                : callState === "ENDING"
+                ? "Ending Call..."
+                : "Call Lead via Smartflo"
+            }
+            disabled={callState !== "IDLE" && callState !== "ERROR"}
             onClick={handleCall}
             className={`p-1 rounded-md transition-all cursor-pointer ${
-              status === "calling"
-                ? "bg-amber-100 text-amber-700 animate-pulse"
-                : status === "active"
+              callState === "INITIATING" || callState === "RINGING"
+                ? "bg-amber-100 text-amber-700 animate-pulse cursor-not-allowed"
+                : callState === "CONNECTED"
                 ? "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-400"
-                : status === "error"
+                : callState === "ENDING"
+                ? "bg-rose-100 text-rose-700 animate-pulse cursor-not-allowed"
+                : callState === "ERROR"
                 ? "bg-rose-100 text-rose-700 ring-1 ring-rose-400"
                 : "bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-2xs hover:scale-105"
             }`}
           >
-            {status === "calling" ? (
+            {callState === "INITIATING" || callState === "RINGING" || callState === "ENDING" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : status === "active" ? (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            ) : status === "error" ? (
+            ) : callState === "CONNECTED" ? (
+              <PhoneCall className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+            ) : callState === "ERROR" ? (
               <AlertCircle className="w-3.5 h-3.5" />
             ) : (
               <PhoneCall className="w-3.5 h-3.5" />
@@ -251,76 +378,77 @@ export default function ClickToCallButton({
   if (variant === "header-action") {
     return (
       <div className="flex items-center gap-2">
-        {/* Main Call Button */}
-        <button
-          type="button"
-          disabled={status === "calling" || status === "active"}
-          onClick={handleCall}
-          className={`py-1.5 px-3.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer ${
-            status === "calling"
-              ? "bg-amber-50 border border-amber-300 text-amber-800 animate-pulse"
-              : status === "active"
-              ? "bg-emerald-600 text-white shadow-emerald-200 opacity-90 cursor-default"
-              : status === "error"
-              ? "bg-rose-50 border border-rose-300 text-rose-700"
-              : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 active:scale-95"
-          }`}
-          title={feedback || "Call this lead via Smartflo"}
-        >
-          {status === "calling" ? (
-            <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>Connecting...</span>
-            </>
-          ) : status === "active" ? (
-            <>
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Call Active</span>
-            </>
-          ) : status === "error" ? (
-            <>
-              <AlertCircle className="w-3.5 h-3.5" />
-              <span>Failed</span>
-            </>
-          ) : (
-            <>
-              <PhoneCall className="w-3.5 h-3.5" />
-              <span>Call Lead</span>
-            </>
-          )}
-        </button>
-
-        {/* Dedicated Red Hang Up Button: Shown only when call is active or pending disconnect */}
-        {status === "active" && (
+        {/* State 1: IDLE / ERROR */}
+        {(callState === "IDLE" || callState === "ERROR") && (
           <button
             type="button"
-            disabled={hangupStatus === "hanging_up" || hangupStatus === "disconnect_pending"}
-            onClick={handleHangup}
-            className={`py-1.5 px-3.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer animate-in fade-in zoom-in-95 duration-150 ${
-              hangupStatus === "hanging_up"
-                ? "bg-amber-500 text-white animate-pulse"
-                : hangupStatus === "disconnect_pending"
-                ? "bg-rose-800 text-white opacity-80"
-                : "bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/25 active:scale-95"
+            onClick={handleCall}
+            className={`py-1.5 px-3.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer ${
+              callState === "ERROR"
+                ? "bg-rose-50 border border-rose-300 text-rose-700"
+                : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 active:scale-95"
             }`}
-            title="Disconnect ongoing Smartflo call"
+            title={feedback || "Call this lead via Smartflo"}
           >
-            {hangupStatus === "hanging_up" ? (
+            {callState === "ERROR" ? (
               <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Hanging up...</span>
-              </>
-            ) : hangupStatus === "disconnect_pending" ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Disconnecting...</span>
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>Call Failed</span>
               </>
             ) : (
               <>
-                <PhoneOff className="w-3.5 h-3.5" />
-                <span>Hang Up</span>
+                <PhoneCall className="w-3.5 h-3.5" />
+                <span>Call Lead</span>
               </>
             )}
+          </button>
+        )}
+
+        {/* State 2: INITIATING / RINGING (Disabled, Loading Indicator) */}
+        {(callState === "INITIATING" || callState === "RINGING") && (
+          <button
+            type="button"
+            disabled
+            className="py-1.5 px-3.5 text-xs font-bold rounded-xl flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 animate-pulse cursor-not-allowed shadow-xs"
+            title="Waiting for Smartflo agent extension to answer"
+          >
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-700" />
+            <span>{callState === "INITIATING" ? "Calling..." : "Waiting for Agent..."}</span>
+          </button>
+        )}
+
+        {/* State 3: CONNECTED (Replaced with Hangup + Duration) */}
+        {callState === "CONNECTED" && (
+          <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-150">
+            {/* Duration Pill */}
+            <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <Clock className="w-3 h-3 mr-1" />
+              {formatTimer(secondsElapsed)}
+            </span>
+
+            {/* Hangup Button */}
+            <button
+              type="button"
+              onClick={handleHangup}
+              className="py-1.5 px-3.5 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/25 active:scale-95"
+              title="Hangup active Smartflo call"
+            >
+              <PhoneOff className="w-3.5 h-3.5" />
+              <span>Hangup</span>
+            </button>
+          </div>
+        )}
+
+        {/* State 4: ENDING (Disabled, Disconnecting indicator) */}
+        {callState === "ENDING" && (
+          <button
+            type="button"
+            disabled
+            className="py-1.5 px-3.5 text-xs font-bold rounded-xl flex items-center gap-1.5 bg-rose-50 border border-rose-300 text-rose-700 animate-pulse cursor-not-allowed shadow-xs"
+            title="Disconnecting call from Smartflo..."
+          >
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-600" />
+            <span>Ending...</span>
           </button>
         )}
       </div>
@@ -330,41 +458,52 @@ export default function ClickToCallButton({
   // 3. Standard Button Variant
   return (
     <div className="inline-flex items-center gap-2">
-      <button
-        type="button"
-        disabled={status === "calling" || status === "active"}
-        onClick={handleCall}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-          status === "calling"
-            ? "bg-amber-100 text-amber-800"
-            : status === "active"
-            ? "bg-emerald-600 text-white"
-            : status === "error"
-            ? "bg-rose-100 text-rose-800"
-            : "bg-emerald-600 hover:bg-emerald-700 text-white"
-        }`}
-      >
-        {status === "calling" ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        ) : (
-          <PhoneCall className="w-3.5 h-3.5" />
-        )}
-        <span>{status === "calling" ? "Connecting..." : status === "active" ? "In Call" : "Call"}</span>
-      </button>
-
-      {status === "active" && (
+      {(callState === "IDLE" || callState === "ERROR") && (
         <button
           type="button"
-          disabled={hangupStatus === "hanging_up" || hangupStatus === "disconnect_pending"}
-          onClick={handleHangup}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-all cursor-pointer"
+          onClick={handleCall}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all cursor-pointer"
         >
-          {hangupStatus === "hanging_up" || hangupStatus === "disconnect_pending" ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
+          <PhoneCall className="w-3.5 h-3.5" />
+          <span>Call Lead</span>
+        </button>
+      )}
+
+      {(callState === "INITIATING" || callState === "RINGING") && (
+        <button
+          type="button"
+          disabled
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-100 text-amber-800 cursor-not-allowed"
+        >
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>{callState === "INITIATING" ? "Calling..." : "Waiting for Agent..."}</span>
+        </button>
+      )}
+
+      {callState === "CONNECTED" && (
+        <div className="inline-flex items-center gap-1.5">
+          <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded">
+            {formatTimer(secondsElapsed)}
+          </span>
+          <button
+            type="button"
+            onClick={handleHangup}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-all cursor-pointer"
+          >
             <PhoneOff className="w-3.5 h-3.5" />
-          )}
-          <span>{hangupStatus === "hanging_up" ? "Hanging up..." : "Hang Up"}</span>
+            <span>Hangup</span>
+          </button>
+        </div>
+      )}
+
+      {callState === "ENDING" && (
+        <button
+          type="button"
+          disabled
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-100 text-rose-800 cursor-not-allowed"
+        >
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>Ending...</span>
         </button>
       )}
     </div>

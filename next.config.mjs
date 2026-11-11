@@ -3,7 +3,7 @@ const nextConfig = {
   async rewrites() {
     // Read backend URL from environment variables, fallback to localhost for development
     // Trim trailing slashes to prevent malformed double-slash URLs like https://crmbackend.seedsofinnocens.com//api/v1/...
-    const rawBackendUrl = process.env.BACKEND_API_URL;
+    const rawBackendUrl = process.env.BACKEND_API_URL || "http://localhost:6000";
     const backendUrl = rawBackendUrl.replace(/\/+$/, "");
 
     return {

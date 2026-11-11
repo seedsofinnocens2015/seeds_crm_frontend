@@ -32,7 +32,6 @@ import {
 } from "lucide-react";
 import TeamLeaderSidebar from "@/app/components/TeamLeaderSidebar";
 import Footer from "@/app/components/Footer";
-import BulkAssignModal from "@/app/components/BulkAssignModal";
 import {
   getTodayDDMMMYY,
   formatDateToDDMMMYY,
@@ -529,14 +528,6 @@ function getTodayISODate(): string {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setIsBulkAssignOpen(true)}
-              className="py-2 px-3.5 bg-[#cc2727] hover:bg-[#b02121] text-black text-xs font-semibold rounded-xl flex items-center gap-2 shadow-lg shadow-[#cc2727]/20 transition-all active:scale-95 cursor-pointer"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Bulk Assign Leads</span>
-            </button>
 
             <button
               onClick={handleSave}
@@ -615,15 +606,6 @@ function getTodayISODate(): string {
 
             {/* Quick Actions & Status */}
             <div className="sm:self-center flex flex-col items-start sm:items-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setIsBulkAssignOpen(true)}
-                className="py-2 px-4 rounded-xl text-xs font-semibold flex items-center gap-2 bg-[#cc2727] hover:bg-[#b02121] text-black shadow-md shadow-[#cc2727]/20 transition-all cursor-pointer"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>Bulk Assign Leads</span>
-              </button>
-
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-600">
                   Status:
@@ -756,15 +738,7 @@ function getTodayISODate(): string {
 
             {assignedToThisAgent.length === 0 ? (
               <div className="text-center py-8 text-gray-600 text-xs">
-                No leads currently assigned to this agent. Click{" "}
-                <button
-                  type="button"
-                  onClick={() => setIsBulkAssignOpen(true)}
-                  className="text-[#cc2727] hover:underline font-semibold"
-                >
-                  Bulk Assign Leads
-                </button>{" "}
-                to allocate leads.
+                No leads currently assigned to this agent.
               </div>
             ) : (
               <div className="overflow-x-auto max-h-72 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 border border-slate-200 rounded-xl">
@@ -1266,20 +1240,6 @@ function getTodayISODate(): string {
         </main>
         <Footer />
       </div>
-
-      {/* Bulk Assign Modal (Agents) */}
-      <BulkAssignModal
-        isOpen={isBulkAssignOpen}
-        onClose={() => setIsBulkAssignOpen(false)}
-        agentId={memberId}
-        agentName={formData.name}
-        allLeads={allLeads}
-        onAssignedSuccess={async (count) => {
-          setToastMessage(`Successfully assigned ${count} lead(s) to agent ${formData.name}!`);
-          setTimeout(() => setToastMessage(""), 5000);
-          await refreshLeads();
-        }}
-      />
     </div>
   );
 }
