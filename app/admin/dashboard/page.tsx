@@ -38,6 +38,7 @@ export default function AdminDashboard() {
   }, [router]);
 
   const handleLogout = async () => {
+    try { localStorage.removeItem('seeds_crm_token'); } catch {}
     try {
       await apiFetch("/api/auth/logout", { method: "POST" });
       router.push("/admin/login");

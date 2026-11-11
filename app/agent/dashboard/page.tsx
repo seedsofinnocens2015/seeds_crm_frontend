@@ -204,6 +204,7 @@ export default function AgentDashboard() {
   }, [router]);
 
   const handleLogout = async () => {
+    try { localStorage.removeItem('seeds_crm_token'); } catch {}
     await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/agent/login");
   };

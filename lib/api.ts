@@ -3,9 +3,11 @@
  * Allows switching between relative Next.js rewrites and direct Backend URL.
  */
 
-// Production backend default
+// Production backend default or from env
 export const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "https://crmbackend.seedsofinnocens.com";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/v1\/?$/, "") ||
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  "https://crmbackend.seedsofinnocens.com";
 
 /**
  * Maps frontend routes to either relative path or direct backend endpoint.
@@ -82,11 +84,25 @@ export function getApiUrl(path: string): string {
 
 /**
  * Universal fetch wrapper that automatically routes to backend with credentials
+ * and token Authorization header for seamless cross-origin support (e.g. localhost -> cloud backend).
  */
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const url = getApiUrl(input);
-  return fetch(url, {
+
+  // If token is saved in localStorage (for cross-origin dev e.g. localhost), attach it
+  const headers = new Headers(init?.headers || {});
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("seeds_crm_token");
+    if (token && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+  }
+
+  const res = await fetch(url, {
     ...init,
+    headers,
     credentials: init?.credentials || "include",
   });
+
+  return res;
 }

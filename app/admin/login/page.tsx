@@ -61,6 +61,7 @@ export default function AdminLoginPage() {
         throw new Error(`Server returned ${res.status} (${res.statusText}): ${text.slice(0, 150)}`);
       }
 
+      if (data.token) { localStorage.setItem('seeds_crm_token', data.token); }
       if (!res.ok) {
         throw new Error(data.error || "Login failed");
       }
