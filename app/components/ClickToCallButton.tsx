@@ -33,6 +33,11 @@ export default function ClickToCallButton({
   const [secondsElapsed, setSecondsElapsed] = useState<number>(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Safety initiation/ringing timeout and polling refs
+  const initiationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSocketEventTimeRef = useRef<number>(0);
+
   // Authenticated user ID for agent-specific correlation
   const [currentUserId, setCurrentUserId] = useState<string>("");
 
@@ -58,21 +63,148 @@ export default function ClickToCallButton({
     };
   }, []);
 
-  // Timer effect for connected calls
+  // Clear active safety timers and intervals helper
+  const clearSafetyTimers = () => {
+    if (initiationTimeoutRef.current) {
+      clearTimeout(initiationTimeoutRef.current);
+      initiationTimeoutRef.current = null;
+    }
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  // Timer effect for connected calls & safety timers cleanup
   useEffect(() => {
     if (callState === "CONNECTED") {
+      clearSafetyTimers();
       setSecondsElapsed(0);
       timerRef.current = setInterval(() => {
         setSecondsElapsed((prev) => prev + 1);
       }, 1000);
-    } else {
+    } else if (callState === "IDLE" || callState === "ERROR" || callState === "ENDING") {
+      clearSafetyTimers();
       if (timerRef.current) clearInterval(timerRef.current);
       setSecondsElapsed(0);
     }
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [callState]);
+
+  // Safety Timeout & Short Polling Fallback during INITIATING and RINGING
+  useEffect(() => {
+    if (callState !== "INITIATING" && callState !== "RINGING") {
+      clearSafetyTimers();
+      return;
+    }
+
+    // 1. Safety Timeout: Reconcile with backend after 45 seconds to prevent indefinite stuck UI
+    const timeoutDurationMs = 45000;
+    initiationTimeoutRef.current = setTimeout(async () => {
+      // Before blindly resetting, check if call is actually connected in backend
+      try {
+        if (leadId) {
+          const res = await apiFetch(`/api/integrations/smartflo/calls/${encodeURIComponent(leadId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const calls = data?.calls || [];
+            const active = calls.find((c: any) => {
+              const matchesCall =
+                (activeRefId && c.refId === activeRefId) ||
+                (activeCallId && c.callId === activeCallId) ||
+                c.status === "connected" ||
+                c.status === "in_progress" ||
+                c.status === "ringing";
+              return matchesCall;
+            });
+
+            if (active && active.status === "connected") {
+              // Call actually connected; transition to connected instead of timing out
+              setCallState("CONNECTED");
+              if (active.refId) setActiveRefId(active.refId);
+              if (active.callId) setActiveCallId(active.callId);
+              if (active.answeredDurationSeconds > 0) {
+                setSecondsElapsed(active.answeredDurationSeconds);
+              }
+              setFeedback("Call Connected");
+              return;
+            }
+          }
+        }
+      } catch {
+        // ignore check error
+      }
+
+      // If Smartflo did not connect, reset state safely with feedback
+      setCallState("IDLE");
+      setActiveRefId("");
+      setActiveCallId("");
+      const timeoutMsg = "Agent extension did not answer / Call timed out";
+      setFeedback(timeoutMsg);
+      if (onError) onError(timeoutMsg);
+      setTimeout(() => setFeedback(""), 4000);
+    }, timeoutDurationMs);
+
+    // 2. Short REST Polling Fallback (every 4 seconds) to guard against dropped Socket.IO events
+    pollIntervalRef.current = setInterval(async () => {
+      // Do not overwrite if a fresher real-time socket event arrived within the last 2 seconds
+      if (Date.now() - lastSocketEventTimeRef.current < 2000) {
+        return;
+      }
+
+      if (!leadId) return;
+
+      try {
+        const res = await apiFetch(`/api/integrations/smartflo/calls/${encodeURIComponent(leadId)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const calls = data?.calls || [];
+        if (!Array.isArray(calls) || calls.length === 0) return;
+
+        // Correlate with active call
+        const relevantCall = calls.find((c: any) => {
+          if (activeRefId && c.refId && c.refId === activeRefId) return true;
+          if (activeCallId && c.callId && c.callId === activeCallId) return true;
+          return c.status === "in_progress" || c.status === "ringing" || c.status === "connected";
+        });
+
+        if (!relevantCall) return;
+
+        // Check if status transitioned to terminal or answered
+        const terminalStatuses = ["answered", "missed", "completed", "ended", "failed", "busy", "no_answer"];
+        if (relevantCall.status === "connected" || (relevantCall.status === "answered" && !relevantCall.hangupCause && relevantCall.durationSeconds === 0)) {
+          // Genuine live answer detected via polling
+          setCallState("CONNECTED");
+          if (relevantCall.refId) setActiveRefId(relevantCall.refId);
+          if (relevantCall.callId) setActiveCallId(relevantCall.callId);
+          if (relevantCall.answeredDurationSeconds > 0) {
+            setSecondsElapsed(relevantCall.answeredDurationSeconds);
+          }
+          setFeedback("Call Connected");
+        } else if (terminalStatuses.includes(relevantCall.status)) {
+          // Terminal state reached: clear active state
+          setCallState("IDLE");
+          setActiveRefId("");
+          setActiveCallId("");
+          setFeedback(relevantCall.status === "answered" ? "Call Ended" : `Call ${relevantCall.status.replace("_", " ")}`);
+          setTimeout(() => setFeedback(""), 3000);
+        } else if (relevantCall.status === "ringing" || relevantCall.status === "in_progress") {
+          // Confirm active ringing
+          if (relevantCall.refId && !activeRefId) setActiveRefId(relevantCall.refId);
+          if (relevantCall.callId && !activeCallId) setActiveCallId(relevantCall.callId);
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 4000);
+
+    return () => {
+      clearSafetyTimers();
+    };
+  }, [callState, leadId, activeRefId, activeCallId]);
 
   // Check active call on initial mount / page refresh
   useEffect(() => {
@@ -140,6 +272,7 @@ export default function ClickToCallButton({
       const detail = (e as CustomEvent).detail;
       if (!matchesCurrentCall(detail)) return;
 
+      lastSocketEventTimeRef.current = Date.now();
       setCallState("RINGING");
       if (detail.refId) setActiveRefId(detail.refId);
       if (detail.callId) setActiveCallId(detail.callId);
@@ -151,6 +284,7 @@ export default function ClickToCallButton({
       const detail = (e as CustomEvent).detail;
       if (!matchesCurrentCall(detail)) return;
 
+      lastSocketEventTimeRef.current = Date.now();
       setCallState("CONNECTED");
       if (detail.refId) setActiveRefId(detail.refId);
       if (detail.callId) setActiveCallId(detail.callId);
@@ -162,6 +296,8 @@ export default function ClickToCallButton({
       const detail = (e as CustomEvent).detail;
       if (!matchesCurrentCall(detail)) return;
 
+      lastSocketEventTimeRef.current = Date.now();
+      clearSafetyTimers();
       setCallState("IDLE");
       setActiveRefId("");
       setActiveCallId("");
@@ -405,17 +541,28 @@ export default function ClickToCallButton({
           </button>
         )}
 
-        {/* State 2: INITIATING / RINGING (Disabled, Loading Indicator) */}
+        {/* State 2: INITIATING / RINGING (With Cancel / Abort Action) */}
         {(callState === "INITIATING" || callState === "RINGING") && (
-          <button
-            type="button"
-            disabled
-            className="py-1.5 px-3.5 text-xs font-bold rounded-xl flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 animate-pulse cursor-not-allowed shadow-xs"
-            title="Waiting for Smartflo agent extension to answer"
-          >
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-700" />
-            <span>{callState === "INITIATING" ? "Calling..." : "Waiting for Agent..."}</span>
-          </button>
+          <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
+            <button
+              type="button"
+              disabled
+              className="py-1.5 px-3 text-xs font-bold rounded-xl flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 shadow-xs cursor-wait"
+              title="Waiting for Smartflo agent extension to answer"
+            >
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-700" />
+              <span>{callState === "INITIATING" ? "Calling..." : "Waiting for Agent..."}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleHangup}
+              className="py-1.5 px-2.5 text-xs font-semibold rounded-xl flex items-center gap-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 transition-all cursor-pointer shadow-xs active:scale-95"
+              title="Cancel call initiation"
+            >
+              <PhoneOff className="w-3 h-3 text-rose-600" />
+              <span>Cancel</span>
+            </button>
+          </div>
         )}
 
         {/* State 3: CONNECTED (Replaced with Hangup + Duration) */}
@@ -471,14 +618,25 @@ export default function ClickToCallButton({
       )}
 
       {(callState === "INITIATING" || callState === "RINGING") && (
-        <button
-          type="button"
-          disabled
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-100 text-amber-800 cursor-not-allowed"
-        >
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          <span>{callState === "INITIATING" ? "Calling..." : "Waiting for Agent..."}</span>
-        </button>
+        <div className="inline-flex items-center gap-1.5 animate-in fade-in duration-150">
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-100 text-amber-800 cursor-wait"
+          >
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>{callState === "INITIATING" ? "Calling..." : "Waiting for Agent..."}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleHangup}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 transition-all cursor-pointer"
+            title="Cancel call initiation"
+          >
+            <PhoneOff className="w-3 h-3 text-rose-600" />
+            <span>Cancel</span>
+          </button>
+        </div>
       )}
 
       {callState === "CONNECTED" && (
