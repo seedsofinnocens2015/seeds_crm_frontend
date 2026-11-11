@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import React, { useState, useEffect } from "react";
 import {
   X,
@@ -86,7 +87,7 @@ export default function UserProfileModal({
         throw new Error("Caller ID must be a valid number format (e.g. +919228173971 or 9228173971).");
       }
 
-      const res = await fetch("/api/auth/smartflo-extension", {
+      const res = await apiFetch("/api/auth/smartflo-extension", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

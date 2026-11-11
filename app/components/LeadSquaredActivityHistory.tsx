@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import React, { useState, useMemo, useEffect } from "react";
 import {
   Activity,
@@ -197,7 +198,7 @@ export default function LeadSquaredActivityHistory({
     const leadId = leadData?.uniqueId || leadData?._id;
     if (!leadId) return;
 
-    fetch(`/api/integrations/smartflo/calls/${encodeURIComponent(leadId)}`)
+    apiFetch(`/api/integrations/smartflo/calls/${encodeURIComponent(leadId)}`)
       .then((res) => {
         if (!res.ok) return { calls: [] };
         return res.json();

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { ALL_LEADS_COLUMNS } from "@/lib/columnsConfig";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -405,7 +406,7 @@ export default function AdminLeadsPage() {
 
     setIsBulkUpdating(true);
     try {
-      const res = await fetch("/api/admin/leads/bulk-update", {
+      const res = await apiFetch("/api/admin/leads/bulk-update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -449,7 +450,7 @@ export default function AdminLeadsPage() {
       const ids = Array.from(selectedLeadIds);
       let deletedCount = 0;
       for (const id of ids) {
-        const res = await fetch(`/api/admin/leads/${id}`, { method: "DELETE" });
+        const res = await apiFetch(`/api/admin/leads/${id}`, { method: "DELETE" });
         if (res.ok) deletedCount++;
       }
       setToastMessage(`Successfully deleted ${deletedCount} lead(s).`);
@@ -595,7 +596,7 @@ export default function AdminLeadsPage() {
         fieldValuesToSave[k] = item.value;
       });
 
-      const res = await fetch("/api/admin/leads/merge", {
+      const res = await apiFetch("/api/admin/leads/merge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -791,9 +792,9 @@ export default function AdminLeadsPage() {
     try {
       // Parallel execution of Auth verification, Leads fetch, and Members fetch
       const [meRes, leadsRes, membersRes] = await Promise.all([
-        fetch("/api/auth/me"),
-        fetch("/api/admin/leads", { cache: "no-store" }),
-        fetch("/api/admin/members").catch(() => null),
+        apiFetch("/api/auth/me"),
+        apiFetch("/api/admin/leads", { cache: "no-store" }),
+        apiFetch("/api/admin/members").catch(() => null),
       ]);
 
       if (!meRes.ok) {
@@ -837,7 +838,7 @@ export default function AdminLeadsPage() {
   }, []);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/admin/login");
   };
 
@@ -860,7 +861,7 @@ export default function AdminLeadsPage() {
 
     try {
       const targetId = leadToDelete.uniqueId || leadToDelete._id;
-      const res = await fetch(`/api/admin/leads/${targetId}`, {
+      const res = await apiFetch(`/api/admin/leads/${targetId}`, {
         method: "DELETE",
       });
 

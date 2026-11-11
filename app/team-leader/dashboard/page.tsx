@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutDashboard, Clock } from "lucide-react";
@@ -14,7 +15,7 @@ export default function TeamLeaderDashboard() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await apiFetch("/api/auth/me");
         if (!res.ok) {
           router.push("/team-leader/login");
           return;
@@ -38,7 +39,7 @@ export default function TeamLeaderDashboard() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await apiFetch("/api/auth/logout", { method: "POST" });
       router.push("/team-leader/login");
     } catch {
       router.push("/team-leader/login");

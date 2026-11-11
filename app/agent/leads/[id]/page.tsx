@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -267,10 +268,10 @@ export default function LeadDetailPage({
   const loadData = async () => {
     try {
       const [meRes, cfgRes, membersRes, leadRes] = await Promise.all([
-        fetch("/api/auth/me"),
-        fetch("/api/admin/form-config").catch(() => null),
-        fetch("/api/admin/members").catch(() => null),
-        fetch(`/api/agent/leads/${leadId}`, { cache: "no-store" }),
+        apiFetch("/api/auth/me"),
+        apiFetch("/api/admin/form-config").catch(() => null),
+        apiFetch("/api/admin/members").catch(() => null),
+        apiFetch(`/api/agent/leads/${leadId}`, { cache: "no-store" }),
       ]);
 
       if (!meRes.ok) {
@@ -453,7 +454,7 @@ export default function LeadDetailPage({
       const whatsappFull = whatsappRawPhone ? `${whatsappCountryCode} ${whatsappRawPhone}`.trim() : "";
       const otherFull = otherRawPhone ? `${otherCountryCode} ${otherRawPhone}`.trim() : "";
 
-      const res = await fetch(`/api/agent/leads/${leadId}`, {
+      const res = await apiFetch(`/api/agent/leads/${leadId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -490,7 +491,7 @@ export default function LeadDetailPage({
   };
 
   const handleAddQuickNote = async (noteText: string) => {
-    const res = await fetch(`/api/agent/leads/${leadId}`, {
+    const res = await apiFetch(`/api/agent/leads/${leadId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -521,7 +522,7 @@ export default function LeadDetailPage({
     setError("");
 
     try {
-      const res = await fetch(`/api/agent/leads/${leadId}`, {
+      const res = await apiFetch(`/api/agent/leads/${leadId}`, {
         method: "DELETE",
       });
 

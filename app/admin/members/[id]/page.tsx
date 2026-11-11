@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -104,7 +105,7 @@ function getTodayISODate(): string {
     async function loadData() {
       try {
         // 1. Check Auth (Admin)
-        const meRes = await fetch("/api/auth/me");
+        const meRes = await apiFetch("/api/auth/me");
         if (!meRes.ok) {
           router.push("/admin/login");
           return;
@@ -117,7 +118,7 @@ function getTodayISODate(): string {
         setUser(meData.user);
 
         // 2. Fetch Member Details
-        const memberRes = await fetch(`/api/admin/members/${memberId}`, {
+        const memberRes = await apiFetch(`/api/admin/members/${memberId}`, {
           cache: "no-store",
         });
         if (!memberRes.ok) {
@@ -164,7 +165,7 @@ function getTodayISODate(): string {
 
   const refreshLeads = async () => {
     try {
-      const leadsRes = await fetch("/api/admin/leads?limit=all", { cache: "no-store" });
+      const leadsRes = await apiFetch("/api/admin/leads?limit=all", { cache: "no-store" });
       if (leadsRes.ok) {
         const ld = await leadsRes.json();
         setAllLeads(ld.leads || []);
@@ -398,7 +399,7 @@ function getTodayISODate(): string {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/admin/login");
   };
 
@@ -444,7 +445,7 @@ function getTodayISODate(): string {
         payload.password = formData.password.trim();
       }
 
-      const res = await fetch(`/api/admin/members/${memberId}`, {
+      const res = await apiFetch(`/api/admin/members/${memberId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -470,7 +471,7 @@ function getTodayISODate(): string {
     setError("");
 
     try {
-      const res = await fetch(`/api/admin/members/${memberId}`, {
+      const res = await apiFetch(`/api/admin/members/${memberId}`, {
         method: "DELETE",
       });
 

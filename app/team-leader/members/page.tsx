@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -26,7 +27,7 @@ export default function TeamLeaderMembersPage() {
   const fetchSessionAndMembers = async () => {
     try {
       // 1. Check Team Leader Auth
-      const meRes = await fetch("/api/auth/me");
+      const meRes = await apiFetch("/api/auth/me");
       if (!meRes.ok) {
         router.push("/team-leader/login");
         return;
@@ -39,7 +40,7 @@ export default function TeamLeaderMembersPage() {
       setUser(meData.user);
 
       // 2. Fetch Members (no-cache)
-      const membersRes = await fetch("/api/admin/members", {
+      const membersRes = await apiFetch("/api/admin/members", {
         cache: "no-store",
       });
       if (membersRes.ok) {
@@ -62,7 +63,7 @@ export default function TeamLeaderMembersPage() {
   }, []);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/team-leader/login");
   };
 
@@ -97,7 +98,7 @@ export default function TeamLeaderMembersPage() {
     setTogglingId(member._id);
 
     try {
-      const res = await fetch(`/api/admin/members/${member._id}`, {
+      const res = await apiFetch(`/api/admin/members/${member._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),

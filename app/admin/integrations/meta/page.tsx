@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AdminSidebar from "@/app/components/AdminSidebar";
@@ -210,7 +211,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
   const fetchAllData = useCallback(async (isSilent = false) => {
     if (!isSilent) setRefreshing(true);
     try {
-      const authRes = await fetch("/api/auth/me");
+      const authRes = await apiFetch("/api/auth/me");
       if (!authRes.ok) {
         router.push("/admin/login");
         return;
@@ -225,10 +226,10 @@ export default function UnifiedMetaAdsIntegrationPage() {
 
       // Fetch Account, Pages, Events, and Setups concurrently
       const [accRes, pagesRes, eventsRes, setupsRes] = await Promise.all([
-        fetch("/api/integrations/meta/account", { cache: "no-store" }),
-        fetch("/api/integrations/meta/pages", { cache: "no-store" }),
-        fetch("/api/integrations/meta/events?limit=30", { cache: "no-store" }),
-        fetch("/api/integrations/meta/setup", { cache: "no-store" }),
+        apiFetch("/api/integrations/meta/account", { cache: "no-store" }),
+        apiFetch("/api/integrations/meta/pages", { cache: "no-store" }),
+        apiFetch("/api/integrations/meta/events?limit=30", { cache: "no-store" }),
+        apiFetch("/api/integrations/meta/setup", { cache: "no-store" }),
       ]);
 
       let loadedAccount: MetaAccount | null = null;
@@ -309,7 +310,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
   const handleConnectOAuth = async () => {
     setConnecting(true);
     try {
-      const res = await fetch("/api/integrations/meta/oauth/start");
+      const res = await apiFetch("/api/integrations/meta/oauth/start");
       const data = await res.json();
       if (!res.ok || !data?.authUrl) {
         throw new Error(data?.error || "Failed to generate authorization URL");
@@ -333,7 +334,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
     if (nextState && !formsMap[pageId]) {
       setLoadingFormsMap((prev) => ({ ...prev, [pageId]: true }));
       try {
-        const res = await fetch(`/api/integrations/meta/pages/${pageId}/forms`, {
+        const res = await apiFetch(`/api/integrations/meta/pages/${pageId}/forms`, {
           cache: "no-store",
         });
         const data = await res.json();
@@ -364,7 +365,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
         updatedForms = [...currentSelected, formId];
       }
 
-      const res = await fetch(`/api/integrations/meta/pages/${page.pageId}/forms/sync`, {
+      const res = await apiFetch(`/api/integrations/meta/pages/${page.pageId}/forms/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ formIds: updatedForms }),
@@ -396,7 +397,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
   const handleConfirmDisconnect = async () => {
     try {
       if (disconnectModal.type === "account") {
-        const res = await fetch("/api/integrations/meta/disconnect-account", { method: "POST" });
+        const res = await apiFetch("/api/integrations/meta/disconnect-account", { method: "POST" });
         if (!res.ok) throw new Error("Failed to disconnect Meta account");
         setStatusMessage({
           type: "info",
@@ -404,7 +405,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
         });
       } else if (disconnectModal.type === "page" && disconnectModal.target?.pageId) {
         const pageId = disconnectModal.target.pageId;
-        const res = await fetch(`/api/integrations/meta/pages/${pageId}`, { method: "DELETE" });
+        const res = await apiFetch(`/api/integrations/meta/pages/${pageId}`, { method: "DELETE" });
         if (!res.ok) throw new Error(`Failed to disconnect page ${pageId}`);
         setStatusMessage({
           type: "info",
@@ -438,7 +439,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
     if (!formsMap[pId]) {
       setLoadingFormsMap((prev) => ({ ...prev, [pId]: true }));
       try {
-        const res = await fetch(`/api/integrations/meta/pages/${pId}/forms`, {
+        const res = await apiFetch(`/api/integrations/meta/pages/${pId}/forms`, {
           cache: "no-store",
         });
         const data = await res.json();
@@ -486,7 +487,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
     setStatusMessage(null);
 
     try {
-      const res = await fetch("/api/integrations/meta/setup/validate", {
+      const res = await apiFetch("/api/integrations/meta/setup/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -566,7 +567,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
         fieldMappings: fieldMappings.filter((m) => m.crmField.trim() && m.formFieldKey.trim()),
       };
 
-      const res = await fetch("/api/integrations/meta/setup/save", {
+      const res = await apiFetch("/api/integrations/meta/setup/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -601,7 +602,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
     setTestingId(setupId);
     setStatusMessage(null);
     try {
-      const res = await fetch(`/api/integrations/meta/setup/${setupId}/test`, {
+      const res = await apiFetch(`/api/integrations/meta/setup/${setupId}/test`, {
         method: "POST",
       });
       const data = await res.json();
@@ -661,7 +662,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
       return;
     }
     try {
-      const res = await fetch(`/api/integrations/meta/setup/${setupId}`, {
+      const res = await apiFetch(`/api/integrations/meta/setup/${setupId}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -681,7 +682,7 @@ export default function UnifiedMetaAdsIntegrationPage() {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await apiFetch("/api/auth/logout", { method: "POST" });
     } catch (err) {
       console.error("Logout error:", err);
     } finally {

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useState, useRef } from "react";
 import {
   X,
@@ -564,7 +565,7 @@ export default function UploadLeadsModal({
     setError("");
 
     try {
-      const res = await fetch("/api/admin/leads/bulk", {
+      const res = await apiFetch("/api/admin/leads/bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leads: parsedLeads }),

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { ALL_LEADS_COLUMNS } from "@/lib/columnsConfig";
 import LeadSquaredFilter from "@/app/components/LeadSquaredFilter";
 import ManageColumnsModal, { ColumnItem } from "@/app/components/ManageColumnsModal";
@@ -297,8 +298,8 @@ export default function AgentLeadsPage() {
       }
       // Parallel execution of Agent Auth and Assigned Leads fetch
       const [meRes, leadsRes] = await Promise.all([
-        fetch("/api/auth/me"),
-        fetch("/api/admin/leads", { cache: "no-store" }),
+        apiFetch("/api/auth/me"),
+        apiFetch("/api/admin/leads", { cache: "no-store" }),
       ]);
 
       if (!meRes.ok) {
@@ -382,7 +383,7 @@ export default function AgentLeadsPage() {
   }, [isModalOpen]);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/agent/login");
   };
 
@@ -408,7 +409,7 @@ export default function AgentLeadsPage() {
 
     try {
       const targetId = leadToDelete.uniqueId || leadToDelete._id;
-      const res = await fetch(`/api/admin/leads/${targetId}`, {
+      const res = await apiFetch(`/api/admin/leads/${targetId}`, {
         method: "DELETE",
       });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -118,8 +119,8 @@ export default function AgentDashboard() {
         setRefreshing(true);
       }
       const [authRes, leadsRes] = await Promise.all([
-        fetch("/api/auth/me"),
-        fetch("/api/admin/leads?view=dashboard", { cache: "no-store" }),
+        apiFetch("/api/auth/me"),
+        apiFetch("/api/admin/leads?view=dashboard", { cache: "no-store" }),
       ]);
 
       if (!authRes.ok) {
@@ -203,7 +204,7 @@ export default function AgentDashboard() {
   }, [router]);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/agent/login");
   };
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
@@ -51,7 +52,7 @@ async function fetchSessionData(): Promise<{ token: string | null; role: string 
     return { token: cachedAuthToken, role: cachedUserRole };
   }
   try {
-    const res = await fetch("/api/auth/me");
+    const res = await apiFetch("/api/auth/me");
     if (!res.ok) return { token: null, role: null };
     const data = await res.json();
     if (data?.token) {

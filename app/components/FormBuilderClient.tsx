@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AdminSidebar from "@/app/components/AdminSidebar";
@@ -77,7 +78,7 @@ export default function FormBuilderClient({ role }: FormBuilderClientProps) {
   useEffect(() => {
     async function init() {
       try {
-        const meRes = await fetch("/api/auth/me");
+        const meRes = await apiFetch("/api/auth/me");
         if (!meRes.ok) {
           router.push(role === "admin" ? "/admin/login" : "/team-leader/login");
           return;
@@ -94,7 +95,7 @@ export default function FormBuilderClient({ role }: FormBuilderClientProps) {
         setUser(meData.user);
 
         // Fetch form configuration
-        const configRes = await fetch("/api/admin/form-config");
+        const configRes = await apiFetch("/api/admin/form-config");
         if (configRes.ok) {
           const cData = await configRes.json();
           if (cData.config?.fields) {
@@ -123,7 +124,7 @@ export default function FormBuilderClient({ role }: FormBuilderClientProps) {
   }, [role, router]);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     router.push(role === "admin" ? "/admin/login" : "/team-leader/login");
   };
 
@@ -278,7 +279,7 @@ export default function FormBuilderClient({ role }: FormBuilderClientProps) {
     setSaving(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/form-config", {
+      const res = await apiFetch("/api/admin/form-config", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -307,7 +308,7 @@ export default function FormBuilderClient({ role }: FormBuilderClientProps) {
     setResetting(true);
     setError("");
     try {
-      const res = await fetch("/api/admin/form-config/reset", { method: "POST" });
+      const res = await apiFetch("/api/admin/form-config/reset", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to reset");
       if (data.config?.fields) {
@@ -395,7 +396,7 @@ export default function FormBuilderClient({ role }: FormBuilderClientProps) {
     (async () => {
       try {
         setSaving(true);
-        const res = await fetch("/api/admin/form-config", {
+        const res = await apiFetch("/api/admin/form-config", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

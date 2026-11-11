@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { ALL_LEADS_COLUMNS } from "@/lib/columnsConfig";
 import LeadSquaredFilter from "@/app/components/LeadSquaredFilter";
 import ManageColumnsModal, { ColumnItem } from "@/app/components/ManageColumnsModal";
@@ -435,8 +436,8 @@ export default function MISLeadsPage() {
     try {
       // Parallel execution of Auth and Leads fetch
       const [meRes, leadsRes] = await Promise.all([
-        fetch("/api/auth/me"),
-        fetch("/api/admin/leads", { cache: "no-store" }),
+        apiFetch("/api/auth/me"),
+        apiFetch("/api/admin/leads", { cache: "no-store" }),
       ]);
 
       if (!meRes.ok) {
@@ -469,7 +470,7 @@ export default function MISLeadsPage() {
   }, []);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/mis/login");
   };
 

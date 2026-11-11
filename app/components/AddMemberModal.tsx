@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useState } from "react";
 import { X, UserPlus, Shield, User, FileSpreadsheet, Megaphone } from "lucide-react";
 
@@ -37,7 +38,7 @@ export default function AddMemberModal({
     setLoading(true);
 
     try {
-      const res = await fetch("/api/admin/members", {
+      const res = await apiFetch("/api/admin/members", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

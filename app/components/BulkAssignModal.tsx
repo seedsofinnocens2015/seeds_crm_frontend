@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState, useMemo } from "react";
 import {
   FolderKanban,
@@ -165,7 +166,7 @@ export default function BulkAssignModal({
     setError("");
 
     try {
-      const res = await fetch("/api/admin/leads/assign-bulk", {
+      const res = await apiFetch("/api/admin/leads/assign-bulk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

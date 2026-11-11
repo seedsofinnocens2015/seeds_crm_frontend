@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useState, useEffect, useMemo } from "react";
 import {
   X,
@@ -216,7 +217,7 @@ export default function AddLeadModal({
 
       const fetchConfigAndCallers = async () => {
         try {
-          const cfgRes = await fetch("/api/admin/form-config");
+          const cfgRes = await apiFetch("/api/admin/form-config");
           if (cfgRes.ok) {
             const cfgData = await cfgRes.json();
             if (cfgData.config?.fields && Array.isArray(cfgData.config.fields)) {
@@ -229,7 +230,7 @@ export default function AddLeadModal({
         } catch {}
 
         try {
-          const res = await fetch("/api/admin/members");
+          const res = await apiFetch("/api/admin/members");
           if (res.ok) {
             const data = await res.json();
             const names = (data.members || []).map((m: any) => m.name).filter(Boolean);
@@ -405,7 +406,7 @@ export default function AddLeadModal({
 
     if (limitedDigits.length >= 10) {
       try {
-        const res = await fetch(`/api/admin/leads/check-phone?phone=${encodeURIComponent(limitedDigits)}`);
+        const res = await apiFetch(`/api/admin/leads/check-phone?phone=${encodeURIComponent(limitedDigits)}`);
         if (res.ok) {
           const data = await res.json();
           setPrimaryDuplicates(data.duplicates || []);
@@ -454,7 +455,7 @@ export default function AddLeadModal({
         customFields: customFieldValues,
       };
 
-      const res = await fetch("/api/admin/leads", {
+      const res = await apiFetch("/api/admin/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

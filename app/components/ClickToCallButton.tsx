@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import React, { useState, useEffect, useRef } from "react";
 import { Phone, PhoneCall, PhoneOff, Loader2, AlertCircle, Clock } from "lucide-react";
 
@@ -40,7 +41,7 @@ export default function ClickToCallButton({
     let isMounted = true;
     async function loadMe() {
       try {
-        const res = await fetch("/api/auth/me");
+        const res = await apiFetch("/api/auth/me");
         if (res.ok) {
           const data = await res.json();
           if (isMounted && data?.user?.id) {
@@ -79,7 +80,7 @@ export default function ClickToCallButton({
     async function checkActiveCall() {
       if (!leadId) return;
       try {
-        const res = await fetch(`/api/integrations/smartflo/calls/${encodeURIComponent(leadId)}`);
+        const res = await apiFetch(`/api/integrations/smartflo/calls/${encodeURIComponent(leadId)}`);
         if (!res.ok) return;
         const data = await res.json();
         const calls = data?.calls || [];
@@ -202,7 +203,7 @@ export default function ClickToCallButton({
     setFeedback("");
 
     try {
-      const res = await fetch("/api/integrations/smartflo/click-to-call", {
+      const res = await apiFetch("/api/integrations/smartflo/click-to-call", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -251,7 +252,7 @@ export default function ClickToCallButton({
     setCallState("ENDING");
 
     try {
-      const res = await fetch("/api/integrations/smartflo/hangup", {
+      const res = await apiFetch("/api/integrations/smartflo/hangup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

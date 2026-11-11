@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
 import { useState, useEffect } from "react";
 import {
   X,
@@ -75,7 +76,7 @@ export default function MemberDetailModal({
     setError("");
 
     try {
-      const res = await fetch(`/api/admin/members/${member._id}`, {
+      const res = await apiFetch(`/api/admin/members/${member._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
@@ -110,7 +111,7 @@ export default function MemberDetailModal({
         payload.password = editForm.password.trim();
       }
 
-      const res = await fetch(`/api/admin/members/${member._id}`, {
+      const res = await apiFetch(`/api/admin/members/${member._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -134,7 +135,7 @@ export default function MemberDetailModal({
     setError("");
 
     try {
-      const res = await fetch(`/api/admin/members/${member._id}`, {
+      const res = await apiFetch(`/api/admin/members/${member._id}`, {
         method: "DELETE",
       });
 
